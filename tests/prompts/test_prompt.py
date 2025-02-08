@@ -3,6 +3,7 @@
 
 import argparse
 import sys
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -11,6 +12,7 @@ project_root = Path(__file__).parents[2]
 sys.path.insert(0, str(project_root))
 
 from prompts.prompt_manager import PromptManager
+from memory.context_manager import ContextStorage
 
 def save_prompt(content: str, prompt_name: str = "default") -> str:
     """Save prompt content to a timestamped file."""
@@ -28,6 +30,46 @@ def save_prompt(content: str, prompt_name: str = "default") -> str:
     
     return str(prompt_file)
 
+def get_latest_context(context_dir: str = "memory/context_logs", lines: int = 300) -> str:
+    """Get the most recent context from actual log files."""
+    # Get the most recent context file
+    context_dir = project_root / context_dir
+    if not context_dir.exists():
+        return "[No context logs found]"
+        
+    context_files = sorted(context_dir.glob("context_*.txt"), reverse=True)
+    if not context_files:
+        return "[No context files found]"
+        
+    latest_file = context_files[0]
+    
+    # Read the context using the same logic as main_autonomous
+    try:
+        with open(latest_file, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
+        snippet = all_lines[-lines:] if len(all_lines) > lines else all_lines
+        context = "".join(snippet).strip()
+        
+        # Format it like the LLM sees it
+        return f"""
+Current goal: FOLLOW ALL INSTRUCTIONS EXPLICITLY. FORMAT TOOL CALLS CORRECTLY.
+
+Here is the recent context (last {lines} lines of logs):
+----------------------------------------
+{context}
+----------------------------------------
+
+Plan your next step. You can call any tool if needed. 
+Do not stop until you have achieved your goal.
+You will have amnesia at the beginning of each session, so you must review the provided context 
+and use it to achieve your goal.
+
+The main prompts do not know how far you've made it into your goal, so don't assume you're starting
+from scratch.
+"""
+    except Exception as e:
+        return f"[ERROR reading context: {e}]"
+
 def main():
     parser = argparse.ArgumentParser(description='Display full prompt from prompt manager')
     parser.add_argument('--prompt', type=str,
@@ -35,6 +77,11 @@ def main():
     parser.add_argument('--list', '-l',
                        action='store_true',
                        help='List available prompts')
+    parser.add_argument('--with-context', '-c',
+                       action='store_true',
+                       help='Include actual latest context as seen by LLM')
+    parser.add_argument('--lines', type=int, default=300,
+                       help='Number of context lines to include (default: 300)')
     
     args = parser.parse_args()
     
@@ -50,6 +97,10 @@ def main():
     
     # Get full prompt
     full_prompt = prompt_manager.get_full_prompt()
+    
+    # Add context if requested
+    if args.with_context:
+        full_prompt = f"{full_prompt}\n\n{get_latest_context(lines=args.lines)}"
     
     # Save to file
     saved_file = save_prompt(full_prompt, args.prompt.lower() if args.prompt else "default")

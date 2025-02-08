@@ -9,6 +9,7 @@ class PromptManager:
     
     DEFAULT_PROMPT = "SELF_OPTIMIZATION"
     SYSTEM_PROMPTS = {"BASE_RULES", "TOOL_MENU"}  # Prompts that shouldn't be listed
+    BENCHMARK_PROMPTS = {"*_BENCHMARK"}  # Add your benchmark prompts here
     
     def __init__(self, default_prompt: str = None, model_name: str = "AI Assistant"):
         """Initialize the prompt manager.
@@ -35,20 +36,24 @@ class PromptManager:
             self.set_active_prompt(default_prompt)
         
     def _load_prompts(self) -> None:
-        """Load all prompts from the system_prompts directory."""
+        """Load all prompts recursively from the system_prompts directory and subdirectories."""
         prompts_dir = Path(__file__).parent / "system_prompts"
         
-        # Load each .py file in the system_prompts directory
-        for prompt_file in prompts_dir.glob("*.py"):
+        # Recursively load each .py file in the system_prompts directory and subdirectories
+        for prompt_file in prompts_dir.rglob("*.py"):
             if prompt_file.stem.startswith("__"):
                 continue
-                
+            
             try:
+                # Get relative path from prompts dir for module import
+                rel_path = prompt_file.relative_to(prompts_dir)
+                # Convert path to module notation (/ -> .)
+                module_path = f"prompts.system_prompts.{str(rel_path.with_suffix('')).replace(os.sep, '.')}"
+                
                 # Import the module to get the PROMPT variable
-                module_name = f"prompts.system_prompts.{prompt_file.stem}"
-                module = __import__(module_name, fromlist=["PROMPT"])
+                module = __import__(module_path, fromlist=["PROMPT"])
                 if hasattr(module, "PROMPT"):
-                    # Extract prompt name from filename
+                    # Extract prompt name from filename and path
                     prompt_name = prompt_file.stem.upper()
                     self.prompts[prompt_name] = module.PROMPT
             except Exception as e:
@@ -99,6 +104,15 @@ class PromptManager:
     
     def get_full_prompt(self) -> str:
         """Get the complete prompt with menu, rules and active prompt."""
+        # Check if current prompt is a benchmark prompt
+        if self.active_prompt in self.BENCHMARK_PROMPTS:
+            return (
+                f"Operating System: {self.get_operating_system()}\n\n"
+                f"Current Date and Time: {self.get_current_datetime()}\n\n"
+                f"{self.get_active_prompt()}"
+            )
+        
+        # Regular full prompt for non-benchmark prompts
         return (
             f"Operating System: {self.get_operating_system()}\n\n"
             f"Current Date and Time: {self.get_current_datetime()}\n\n"

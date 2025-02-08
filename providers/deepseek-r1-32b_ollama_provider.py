@@ -6,7 +6,7 @@ from typing import Dict, Any
 from tools.tool_base import Tool
 
 class OllamaDeepSeekProvider(Tool):
-    name = "ollama_deepseek"
+    name = "deepseek-r1:32b_ollama"
     description = "Provides access to local Ollama-hosted DeepSeek models"
     input_schema = {
         "type": "object",

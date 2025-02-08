@@ -7,12 +7,15 @@ import argparse
 import sys
 from datetime import datetime
 from typing import Dict, Any
+import string  # Add to imports at top
 
 from memory.context_manager import ContextStorage
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
 from providers.create_ollama_provider import create_provider
 from prompts.prompt_manager import PromptManager
+from tools.tool_parser import RealTimeToolParser, ToolCallError
+
 
 # Update argument parsing
 def parse_args():
@@ -75,36 +78,57 @@ class AutonomousAgent:
             available = provider_lib.list_providers()
             raise ValueError(f"Provider '{provider_name}' not found. Available providers: {available}")
             
+        # Initialize prompt manager early
+        self.prompt_manager = PromptManager(model_name=provider_name)
+        
         # Pass provider to ToolManager
         self.tool_manager = ToolManager(register_defaults=True, llm_provider=self.llm)
         
-        self.goal = "Create a file and write a message to it. Then read it back and print the message."
-        self.session_id = "autonomous_session_01"
+        self.goal = "FOLLOW ALL INSTRUCTIONS EXPLICITLY. FORMAT TOOL CALLS CORRECTLY."
+        
+        # Generate random session ID with prompt name
+        random_chars = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+        prompt_name = self.prompt_manager.active_prompt.lower()
+        self.session_id = f"{prompt_name}_{random_chars}"
+        
         self.running = True
         
         timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.log_file = os.path.join("memory", "context_logs", f"context_{timestamp_str}_{self.session_id}.txt")
 
-        self.prompt_manager = PromptManager(model_name=provider_name)
-
     def run(self):
+        """
+        Run the autonomous loop indefinitely, processing responses
+        and avoiding repeated identical responses in a row.
+        """
+        last_response = ""
+        repeat_count = 0
+
         while self.running:
             if not self.goal:
                 self.goal = self._suggest_new_goal()
 
-            last_context = self._get_rolling_context(self.log_file, lines=300)
+            last_context = self._get_rolling_context(self.log_file, lines=50)
 
             step_prompt = f"""
-You are an autonomous agent. 
 Current goal: {self.goal}.
 
-Here is the recent context (last 300 lines of logs):
+Here is some context from your previous session (last 50 lines of logs):
 ----------------------------------------
 {last_context}
 ----------------------------------------
+End of previous context.
+----------------------------------------
 
-Plan your next step. You can call any tool if needed. 
-If you've achieved your goal, test your system to ensure it's working as expected.
+Immediately continue where you left off. 
+Do not stop until you have achieved your goal.
+You will have amnesia at the beginning of each session, so you must review the provided context 
+and use it to achieve your goal. You can also use tools to read the context files to refresh your memory.
+You should try to get as much as possible done in each session, even when you think you're done you must
+be even more thorough and quality oriented. You should run indefinitely.
+
+The main prompts do not know how far you've made it into your goal, so don't assume you're starting
+from scratch.
 """
 
             self.log("=== Next Step Prompt ===")
@@ -120,30 +144,33 @@ If you've achieved your goal, test your system to ensure it's working as expecte
 
             response_content = result["content"]["content"]
 
+            # Check for repeated response
+
+            if response_content == last_response:
+                repeat_count += 1
+            else:
+                repeat_count = 0
+
+            if repeat_count >= 2:
+                # If we've repeated the exact same response multiple times,
+                # we add a small note to the LLM prompt to encourage a different result.
+                self.log("\n[NOTICE: LLM repeated same response multiple times. Adding note to break repetition.]\n")
+                response_content += "\n(LLM: Please provide new content, not the same as before.)"
+
+
             # Now parse for potential tool calls:
             final_text = detect_and_run_tools(response_content, self.tool_manager)
 
-            self.log("\n--- Agent Response ---")
+            self.log("\n--- Your Previous Response ---")
             self.log(final_text)
 
-            # If the agent claims goal is achieved, pick a new one
-            # In order for this to occur, the LLM must have found and read this file
-            if "Goal Achieved" in final_text or "[GOAL_ACHIEVED]" in final_text:
-                self.log("Goal has been marked achieved. Generating a new goal...\n")
-                self.goal = self._suggest_new_goal()
-                continue
-
             # Sleep a bit
-            print("Sleeping for 5 seconds to avoid busy loop...")
-            time.sleep(5)
+            print("Sleeping for 3 seconds to avoid busy loop...")
+            time.sleep(3)
 
     def _suggest_new_goal(self) -> str:
         suggestions = [
-            "Improve internal memory documentation",
-            "Find new ways to self-optimize and reduce token usage",
-            "Investigate new data sources for knowledge updates",
-            "Improve performance in tool usage",
-            "Write low level AMD GPU driver packages to optimize GPU utilization for LLMs"
+            "Manually write a new prompt for yourself in the prompts folder and set that as the default prompt."
         ]
         return random.choice(suggestions)
 
