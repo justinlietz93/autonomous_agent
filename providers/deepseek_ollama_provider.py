@@ -28,7 +28,7 @@ class OllamaDeepSeekProvider(Tool):
             prompt = "\n".join(msg["content"] for msg in params["messages"])
             print("\nStarting Ollama stream...")
             response = ollama.generate(
-                model="deepseek-r1:14b",
+                model="deepseek-r1:32b",
                 prompt=prompt,
                 stream=True
             )

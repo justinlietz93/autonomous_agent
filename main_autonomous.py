@@ -47,7 +47,7 @@ Here is the recent context (last 20 lines of logs):
 ----------------------------------------
 
 Plan your next step. You can call any tool if needed. 
-If you've achieved your goal, write "Goal Achieved" to trigger a new goal.
+If you've achieved your goal, test your system to ensure it's working as expected.
 """
 
             # 3) Log out the prompt so we can see it (and it goes into the log file)
@@ -101,7 +101,7 @@ If you've achieved your goal, write "Goal Achieved" to trigger a new goal.
         except Exception as e:
             print(f"[WARNING] Could not write to log file: {e}")
 
-    def _get_rolling_context(self, filepath: str, lines: int = 20) -> str:
+    def _get_rolling_context(self, filepath: str, lines: int = 100) -> str:
         """
         Reads the last `lines` lines from the given log file.
         Returns them as a string. If file doesn’t exist, returns empty string.
