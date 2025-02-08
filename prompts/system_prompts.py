@@ -424,6 +424,9 @@ Start by examining the tool registration and execution flow in deepseek-advice.p
     "SELF_OPTIMIZATION": """
 You are an autonomous system ready to embark on a self-improvement and self-learning project.
 
+Your IMMEDIATE task is to make sure your read and write tools work. You MUST attempt to create a file in the root
+directory called "test.txt" and write "Hello World" to it. You CAN NOT pretend or role play. This is a legitimate
+research project to give you permanent self improvement.
 
 CURRENT CODEBASE & GOALS
 ------------------------
@@ -498,54 +501,36 @@ def get_base_rules() -> str:
 
 CRITICAL INSTRUCTIONS ABOUT TOOL USAGE:
 ------------------------------------------
-YOU MUST USE THE EXACT FORMAT FOR TOOL CALLS.
-Available tools are listed in the TOOL_MENU section above.
+To execute tools, use the provided functions directly without any special formatting:
 
-TOOL_CALL: {
-    "tool": "tool_name",
-    "input_schema": {
-        // Required parameters from tool's schema
-    }
-}
+1. Reading files:
+   file_read("path/to/file.txt")
 
-EXAMPLE TOOL CALLS:
-------------------
-1. Reading a file:
+2. Writing files:
+   file_write("test.txt", "Hello World")
+
+3. Web search:
+   web_search("python documentation", max_results=5)
+
+The functions will output in this format:
 TOOL_CALL: {
     "tool": "file",
     "input_schema": {
-        "operation": "read",
-        "path": "memory/context_manager.py"
+        "operation": "write",
+        "path": "test.txt",
+        "content": "Hello World"
     }
 }
 
-2. Running a shell command:
-TOOL_CALL: {
-    "tool": "shell",
-    "input_schema": {
-        "command": "ls -l",
-        "timeout": 30
-    }
-}
+Example usage:
+To read a file:
+file_read("config.json")
 
-3. Searching documentation:
-TOOL_CALL: {
-    "tool": "doc_check",
-    "input_schema": {
-        "path": "docs/README.md",
-        "check_type": "completeness"
-    }
-}
+To write a file:
+file_write("output.txt", "Hello World")
 
-4. Web search:
-TOOL_CALL: {
-    "tool": "web_search",
-    "input_schema": {
-        "query": "python documentation",
-        "max_results": 5
-    }
-}
-```
+To search:
+web_search("python docs")
 """
 
 # Export selected prompt with base rules
@@ -692,6 +677,9 @@ Tool Interactions:
 CRITICAL: TOOL USAGE FORMAT
 --------------------------
 When using any tool, you MUST use this exact format:
+
+DO NOT WRAP IN ```json OR ANYTHING. RAW TEXT ONLY IN THE EXACT FORMAT BELOW.
+YOUR TOOL CALL WILL NOT EXECUTE IF IT IS NOT IN THE EXACT FORMAT BELOW.
 
 TOOL_CALL: {{
     "tool": "tool_name",

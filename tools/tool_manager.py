@@ -1,6 +1,6 @@
 # LLM_KIT/tools/tool_manager.py
 
-from typing import Dict, Any, List, Type
+from typing import Dict, Any, List, Type, Optional
 from .tool_base import Tool
 from .config import Config, settings
 
@@ -13,7 +13,7 @@ from .web_browser_tool import WebBrowserTool
 from .doc_check_tool import DocCheckTool
 from .package_manager_tool import PackageManagerTool
 from .code_runner_tool import CodeRunnerTool
-from providers.deepseek_ollama_provider import OllamaDeepSeekProvider
+from providers.provider_library import ProviderLibrary
 
 
 
@@ -23,19 +23,20 @@ class ToolManager:
     Follows Anthropic Claude tool use standards.
     """
 
-    def __init__(self, register_defaults: bool = True):
+    def __init__(self, register_defaults: bool = True, llm_provider: Optional[Tool] = None):
         """
         Initialize tool registry.
         
         Args:
             register_defaults: Whether to register default tools
+            llm_provider: Optional LLM provider instance to use
         """
         self.tools: Dict[str, Tool] = {}
         if register_defaults:
             self.register_default_tools()
 
-        if settings.LLM_PROVIDER == "ollama":
-            self.register_tool(OllamaDeepSeekProvider())
+        if llm_provider:
+            self.register_tool(llm_provider)
 
     def register_default_tools(self) -> None:
         """Register all default tools with standard configurations."""
