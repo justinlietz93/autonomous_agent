@@ -4,15 +4,17 @@ import random
 import os
 import time
 import argparse
+import sys
 from datetime import datetime
 from typing import Dict, Any
 
 from memory.context_manager import ContextStorage
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
-from prompts.system_prompts import SELECTED_PROMPT
+from providers.create_ollama_provider import create_provider
+from prompts.prompt_manager import PromptManager
 
-# Add argument parsing
+# Update argument parsing
 def parse_args():
     parser = argparse.ArgumentParser(description='Run autonomous agent with specified LLM provider')
     parser.add_argument('--provider', '-p', 
@@ -21,6 +23,13 @@ def parse_args():
     parser.add_argument('--list-providers', '-l',
                        action='store_true',
                        help='List available providers and exit')
+    parser.add_argument('--new-provider', type=str, 
+                       help="Create new Ollama provider using Ollama name(e.g. qwen2.5-coder)")
+    parser.add_argument('--prompt', type=str,
+                       help="Name of the prompt to use (e.g. SELF_OPTIMIZATION)")
+    parser.add_argument('--list-prompts',
+                       action='store_true',
+                       help='List available prompts and exit')
     return parser.parse_args()
 
 def detect_and_run_tools(response_text: str, tool_manager) -> str:
@@ -76,6 +85,8 @@ class AutonomousAgent:
         timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.log_file = os.path.join("memory", "context_logs", f"context_{timestamp_str}_{self.session_id}.txt")
 
+        self.prompt_manager = PromptManager(model_name=provider_name)
+
     def run(self):
         while self.running:
             if not self.goal:
@@ -102,7 +113,7 @@ If you've achieved your goal, test your system to ensure it's working as expecte
             # Call the LLM for a single response
             result = self.llm.run({
                 "messages": [
-                    {"content": SELECTED_PROMPT},
+                    {"content": self.prompt_manager.get_full_prompt()},
                     {"content": step_prompt}
                 ]
             })
@@ -116,6 +127,7 @@ If you've achieved your goal, test your system to ensure it's working as expecte
             self.log(final_text)
 
             # If the agent claims goal is achieved, pick a new one
+            # In order for this to occur, the LLM must have found and read this file
             if "Goal Achieved" in final_text or "[GOAL_ACHIEVED]" in final_text:
                 self.log("Goal has been marked achieved. Generating a new goal...\n")
                 self.goal = self._suggest_new_goal()
@@ -157,16 +169,36 @@ If you've achieved your goal, test your system to ensure it's working as expecte
 
 if __name__ == "__main__":
     args = parse_args()
-    provider_lib = ProviderLibrary()
     
+    # Handle provider creation
+    if args.new_provider:
+        create_provider(args.new_provider)
+        provider_name = f"{args.new_provider}_ollama"
+        print(f"Provider '{args.new_provider}' created successfully.")
+        print(f"You can now use it by specifying the provider name in the command line.")
+        print(f"Example: python main_autonomous.py --provider {provider_name}")
+        sys.exit(0)
+        
+    # Handle prompt listing
+    if args.list_prompts:
+        prompt_manager = PromptManager()
+        print("Available prompts:")
+        for prompt in prompt_manager.list_prompts():
+            print(f"  - {prompt}")
+        exit(0)
+        
+    # Handle provider listing
     if args.list_providers:
         print("Available providers:")
+        provider_lib = ProviderLibrary()
         for provider in provider_lib.list_providers():
             print(f"  - {provider}")
         exit(0)
         
     try:
         agent = AutonomousAgent(provider_name=args.provider)
+        if args.prompt:
+            agent.prompt_manager.set_active_prompt(args.prompt)
         agent.run()
     except ValueError as e:
         print(f"Error: {e}")
