@@ -1,0 +1,24 @@
+---
+description: DEPENDENCY-MANAGEMENT
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #3) -->
+    <MiniIndex>
+        <Reference index="3" title="DEPENDENCY MANAGEMENT" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #3) -->
+    <Priority name="NORMAL">
+        <Rule index="3" title="DEPENDENCY MANAGEMENT">
+            <Points>
+                <Point>Check dependencies.json before adding any package</Point>
+                <Point>Verify new packages in tech_knowledge.xml</Point>
+                <Point>Always create tests for dependencies</Point>
+                <Point>Monitor token usage &amp; cost</Point>
+                <Point>Separate API dependencies from internal code</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

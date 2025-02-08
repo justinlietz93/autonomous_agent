@@ -1,0 +1,19 @@
+---
+description: BUG-FIX-VERIFICATION
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- VERIFICATION SECTION (Only Rule 7) -->
+    <VERIFICATION>
+        <Rule id="7" title="FIX VERIFICATION">
+            <Points>
+                <Point>Run full test suite after each fix</Point>
+                <Point>Verify fix in all relevant scenarios</Point>
+                <Point>Re-check your error handling logic</Point>
+                <Point>Validate your state management</Point>
+                <Point>Confirm no new errors introduced</Point>
+            </Points>
+        </Rule>
+    </VERIFICATION>
+</DevelopmentRules>

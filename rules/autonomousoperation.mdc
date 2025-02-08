@@ -1,0 +1,27 @@
+---
+description: AUTONOMOUS-OPERATION
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #10) -->
+    <MiniIndex>
+        <Reference index="10" title="AUTONOMOUS OPERATIONS" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #10) -->
+    <Priority name="NORMAL">
+        <Rule index="10" title="AUTONOMOUS OPERATIONS">
+            <Points>
+                <Point>System must self-diagnose</Point>
+                <Point>Auto-recover from failures</Point>
+                <Point>Continuously self-optimize</Point>
+                <Point>Proactive maintenance &amp; updates</Point>
+                <Point>Must self-manage resources</Point>
+                <Point>System explains its decisions</Point>
+                <Point>Learns from operational patterns</Point>
+                <Point>Has automatic backup &amp; restore</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

@@ -1,0 +1,28 @@
+---
+description: AUTOMATION-HUMAN-INTERACTION
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #7) -->
+    <MiniIndex>
+        <Reference index="7" title="AUTOMATION &amp; HUMAN INTERACTION" priority="CRITICAL"/>
+    </MiniIndex>
+
+    <!-- CRITICAL PRIORITY RULES (Only Rule #7) -->
+    <Priority name="CRITICAL">
+        <Rule index="7" title="AUTOMATION &amp; HUMAN INTERACTION">
+            <Points>
+                <Point>System must be self-maintaining and self-extending</Point>
+                <Point>NO human code contributions unless absolutely necessary</Point>
+                <Point>All code changes must be AI-driven and automatically tested</Point>
+                <Point>Human role is limited to high-level goals and critical decisions</Point>
+                <Point>System must self-document and maintain its own standards</Point>
+                <Point>All routine maintenance must be automated</Point>
+                <Point>System must validate its own changes</Point>
+                <Point>Changes must be automatically rolled back if validation fails</Point>
+                <Point>Human overrides require explicit justification and logging</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

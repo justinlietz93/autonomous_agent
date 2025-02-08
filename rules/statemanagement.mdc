@@ -1,0 +1,24 @@
+---
+description: STATE-MANAGEMENT
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX (Only HP Rule 4) -->
+    <MiniIndex>
+        <Reference id="4" title="STATE MANAGEMENT" priority="HIGH-PRIORITY"/>
+    </MiniIndex>
+
+    <!-- HIGH-PRIORITY RULES (Only HP Rule 4) -->
+    <Priority name="HIGH-PRIORITY">
+        <Rule id="4" title="STATE MANAGEMENT">
+            <Points>
+                <Point>Verify all state changes are saved</Point>
+                <Point>Check consistency after each operation</Point>
+                <Point>State files must appear in correct locations</Point>
+                <Point>Validate state format before saving</Point>
+                <Point>Add fallback for load failures</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

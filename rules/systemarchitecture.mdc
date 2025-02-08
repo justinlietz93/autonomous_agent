@@ -1,0 +1,25 @@
+---
+description: SYSTEM-ARCHITECTURE
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #5) -->
+    <MiniIndex>
+        <Reference index="5" title="SYSTEM ARCHITECTURE" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #5) -->
+    <Priority name="NORMAL">
+        <Rule index="5" title="SYSTEM ARCHITECTURE">
+            <Points>
+                <Point>Maintain agent isolation &amp; specialization</Point>
+                <Point>Keep memory system minimal but extensible</Point>
+                <Point>Ensure robust error handling &amp; logging</Point>
+                <Point>Follow autonomous operation principles</Point>
+                <Point>Implement proper feedback loops</Point>
+                <Point>Support graceful degradation of features</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

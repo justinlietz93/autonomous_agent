@@ -1,0 +1,21 @@
+---
+description: BUG-FIX-WORKFLOW
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- WORKFLOW SECTION (Only Rule 6) -->
+    <WORKFLOW>
+        <Rule id="6" title="BUG FIXING WORKFLOW">
+            <Steps>
+                <Step>Reproduce the bug consistently</Step>
+                <Step>Capture full error messages &amp; state</Step>
+                <Step>Identify the exact failure point</Step>
+                <Step>Make the minimal fix</Step>
+                <Step>Verify the fix works</Step>
+                <Step>Check for new regressions</Step>
+                <Step>Update error handling if needed</Step>
+            </Steps>
+        </Rule>
+    </WORKFLOW>
+</DevelopmentRules>

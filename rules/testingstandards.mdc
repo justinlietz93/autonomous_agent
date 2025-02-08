@@ -1,0 +1,20 @@
+---
+description: TESTING-STANDARDS
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <Priority name="BLOCKING">
+        <Rule index="4" title="TESTING STANDARDS">
+            <Points>
+                <Point>ALWAYS ACKNOWLEDGE THE FAILURE MESSAGES AND TRACEBACKS</Point>
+                <Point>Every module requires corresponding test</Point>
+                <Point>Tests must be comprehensive</Point>
+                <Point>Follow test naming conventions</Point>
+                <Point>Include performance and resource tests</Point>
+                <Point>Test all toggleable components independently</Point>
+                <Point>Test module unplugging and rerouting scenarios</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

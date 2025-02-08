@@ -1,0 +1,25 @@
+---
+description: ITERATIVE-LLM-CONTEXT
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #18) -->
+    <MiniIndex>
+        <Reference index="18" title="ITERATIVE LLM CONTEXT" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #18) -->
+    <Priority name="NORMAL">
+        <Rule index="18" title="ITERATIVE LLM CONTEXT">
+            <Points>
+                <Point>All tools &amp; tests must integrate with an LLM in real usage</Point>
+                <Point>Direct tool tests can miss LLM-usage corner cases</Point>
+                <Point>Tools must remain compatible with the Tool base class</Point>
+                <Point>Document any adaptation for the interface</Point>
+                <Point>Unit tests are fine for core logic, but integration tests must use real LLM calls</Point>
+                <Point>Real-world usage patterns must be mirrored in tests</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

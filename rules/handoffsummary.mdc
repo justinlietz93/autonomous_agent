@@ -1,0 +1,73 @@
+---
+description: HANDOFF-SUMMARY
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #17) -->
+    <MiniIndex>
+        <Reference index="17" title="HANDOFF SUMMARY TEMPLATE" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #17) -->
+    <Priority name="NORMAL">
+        <Rule index="17" title="HANDOFF SUMMARY TEMPLATE">
+            <Points>
+                <Point><![CDATA[
+Always use the following multiline template for any project handoff:
+
+"""
+HANDOFF SUMMARY
+
+1. CURRENT STATE
+---------------
+- Project/Component: [Brief description of what's being worked on]
+- Status: [Current state of development/testing]
+- Recent Changes: [List of recent modifications]
+- Active Issues: [Any ongoing problems or bugs]
+
+2. CRITICAL CONTEXT
+------------------
+- Key Files: [List of relevant files and their purposes]
+- Dependencies: [Important dependencies or relationships]
+- Environment: [Any specific environment requirements]
+- Test Status: [Current state of tests, passing/failing]
+
+3. NEXT STEPS
+------------
+- Immediate Tasks: [What needs to be done next]
+- Known Issues: [Issues that need addressing]
+- Potential Improvements: [Areas identified for enhancement]
+- Blocked Items: [Tasks blocked by dependencies/issues]
+
+4. TECHNICAL DETAILS
+-------------------
+- Architecture Changes: [Any modifications to system architecture]
+- API Changes: [Changes to interfaces or endpoints]
+- Database Changes: [Modifications to data structures]
+- Performance Impacts: [Any performance considerations]
+
+5. DOCUMENTATION
+---------------
+- Updated Docs: [Recently updated documentation]
+- Needed Docs: [Documentation that needs to be created/updated]
+- Test Coverage: [State of test documentation]
+- Standards Compliance: [Adherence to project standards]
+
+6. NOTES FOR NEXT INSTANCE
+-------------------------
+- Warnings: [Important cautions or considerations]
+- Suggestions: [Recommendations for next steps]
+- Resources: [Helpful resources or references]
+- Context Windows: [Important context to maintain]
+"""
+
+Rules:
+- Always fill every section. If something doesn't apply, write "N/A" instead.
+- Never omit any section.
+- Verify your information for accuracy before finalizing.
+                ]]></Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

@@ -1,0 +1,18 @@
+---
+description: TEST-DRIVEN-DEVELOPMENT
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <Priority name="BLOCKING">
+        <Rule index="1" title="TEST-DRIVEN DEVELOPMENT">
+            <Points>
+                <Point>Tests MUST be created and passing before implementation</Point>
+                <Point>Create test file first</Point>
+                <Point>Implement until tests pass</Point>
+                <Point>No exceptions to this rule</Point>
+                <Point>Tests must be comprehensive and cover edge cases</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

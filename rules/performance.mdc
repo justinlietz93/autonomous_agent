@@ -1,0 +1,24 @@
+---
+description: SYSTEM-PERFORMANCE
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #6) -->
+    <MiniIndex>
+        <Reference index="6" title="PERFORMANCE &amp; SCALING" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #6) -->
+    <Priority name="NORMAL">
+        <Rule index="6" title="PERFORMANCE &amp; SCALING">
+            <Points>
+                <Point>Monitor &amp; optimize token usage</Point>
+                <Point>Keep system lightweight</Point>
+                <Point>Maintain &lt;100ms response times</Point>
+                <Point>Design for future distributed usage</Point>
+                <Point>Always consider resource constraints</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

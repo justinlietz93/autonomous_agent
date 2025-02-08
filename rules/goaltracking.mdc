@@ -1,0 +1,25 @@
+---
+description: GOAL-TRACKING
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #9) -->
+    <MiniIndex>
+        <Reference index="9" title="GOAL TRACKING &amp; SUCCESS METRICS" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #9) -->
+    <Priority name="NORMAL">
+        <Rule index="9" title="GOAL TRACKING &amp; SUCCESS METRICS">
+            <Points>
+                <Point>Tie each change to a specific goal</Point>
+                <Point>Use quantifiable success metrics</Point>
+                <Point>Track goal completion &amp; alignment</Point>
+                <Point>Goals must adapt based on feedback</Point>
+                <Point>Maintain a goal hierarchy</Point>
+                <Point>Goals must have clear completion criteria</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

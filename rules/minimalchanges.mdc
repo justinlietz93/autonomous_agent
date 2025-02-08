@@ -1,0 +1,23 @@
+---
+description: MINIMAL-CHANGES
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX (Only CP Rule 2) -->
+    <MiniIndex>
+        <Reference id="2" title="MINIMAL CHANGES" priority="CRITICAL-PRIORITY"/>
+    </MiniIndex>
+
+    <!-- CRITICAL-PRIORITY RULES (Only CP Rule 2) -->
+    <Priority name="CRITICAL-PRIORITY">
+        <Rule id="2" title="MINIMAL CHANGES">
+            <Points>
+                <Point>Only fix the current bug—avoid random improvements</Point>
+                <Point>No refactoring unless it’s bug-related</Point>
+                <Point>Keep changes focused &amp; minimal</Point>
+                <Point>Don’t touch unrelated code</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

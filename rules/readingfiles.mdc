@@ -1,0 +1,24 @@
+---
+description: READING-FILES
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #11) -->
+    <MiniIndex>
+        <Reference index="11" title="READING FILES" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #11) -->
+    <Priority name="NORMAL">
+        <Rule index="11" title="READING FILES">
+            <Points>
+                <Point>Read files in max 250-line chunks</Point>
+                <Point>Verify if you have the complete context</Point>
+                <Point>Make multiple calls if needed</Point>
+                <Point>Only read the entire file when truly necessary</Point>
+                <Point>Explain why you read each section</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

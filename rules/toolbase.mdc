@@ -1,0 +1,19 @@
+---
+description: TOOL-BASE-PRESERVATION
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <Priority name="BLOCKING">
+        <Rule index="19" title="TOOL BASE PRESERVATION">
+            <Points>
+                <Point>NEVER modify the tool_base.py file - it is a critical foundation</Point>
+                <Point>All tools must inherit from and comply with the existing Tool class interface</Point>
+                <Point>The Tool class signature must remain: def run(self, input: Dict[str, Any]) -> Dict[str, Any]</Point>
+                <Point>New tool functionality should adapt to the base class, not vice versa</Point>
+                <Point>If base class changes are needed, create a new base class instead</Point>
+                <Point>Document any workarounds needed to maintain tool_base.py compatibility</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

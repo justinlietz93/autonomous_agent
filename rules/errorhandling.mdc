@@ -1,0 +1,24 @@
+---
+description: ERROR-HANDLING
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX (Only CP Rule 3) -->
+    <MiniIndex>
+        <Reference id="3" title="ERROR HANDLING" priority="CRITICAL-PRIORITY"/>
+    </MiniIndex>
+
+    <!-- CRITICAL-PRIORITY RULES (Only CP Rule 3) -->
+    <Priority name="CRITICAL-PRIORITY">
+        <Rule id="3" title="ERROR HANDLING">
+            <Points>
+                <Point>Always log full error messages &amp; stack traces</Point>
+                <Point>Never hide or swallow exceptions silently</Point>
+                <Point>Provide specific error messages</Point>
+                <Point>Ensure errors propagate correctly</Point>
+                <Point>Validate error handling in all cases</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

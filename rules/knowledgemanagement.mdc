@@ -1,0 +1,25 @@
+---
+description: KNOWLEDGE-MANAGEMENT
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX OF RULE SETS (Only Rule #8) -->
+    <MiniIndex>
+        <Reference index="8" title="KNOWLEDGE MANAGEMENT" priority="NORMAL"/>
+    </MiniIndex>
+
+    <!-- NORMAL PRIORITY RULES (Only Rule #8) -->
+    <Priority name="NORMAL">
+        <Rule index="8" title="KNOWLEDGE MANAGEMENT">
+            <Points>
+                <Point>Keep tech knowledge updated by running using APIs in knowledge_base</Point>
+                <Point>Auto-update packages &amp; dependencies</Point>
+                <Point>Track breaking changes &amp; deprecations</Point>
+                <Point>Knowledge must be versioned &amp; rollback-capable</Point>
+                <Point>System learns from past decisions</Point>
+                <Point>Don’t disrupt active operations with updates</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>

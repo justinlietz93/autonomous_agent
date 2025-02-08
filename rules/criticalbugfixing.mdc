@@ -1,0 +1,24 @@
+---
+description: CRITICAL-BUG-FIXING
+globs: 
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<DevelopmentRules>
+    <!-- MINI INDEX (Only CP Rule 1) -->
+    <MiniIndex>
+        <Reference id="1" title="BUG FIXING PRIORITY" priority="CRITICAL-PRIORITY"/>
+    </MiniIndex>
+
+    <!-- CRITICAL-PRIORITY RULES (Only CP Rule 1) -->
+    <Priority name="CRITICAL-PRIORITY">
+        <Rule id="1" title="BUG FIXING PRIORITY">
+            <Points>
+                <Point>No new features until all existing bugs are fixed</Point>
+                <Point>Document every bug with error messages &amp; stack traces</Point>
+                <Point>Consistently reproduce bugs before fixing</Point>
+                <Point>Fix one bug at a time—avoid batch fixes</Point>
+                <Point>Verify each fix doesn't break something new</Point>
+            </Points>
+        </Rule>
+    </Priority>
+</DevelopmentRules>
