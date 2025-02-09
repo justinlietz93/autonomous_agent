@@ -19,6 +19,8 @@ Examples (bridging format):
   file("append", "log.txt", "Additional text")
   file("list_dir", "/some/folder", recursive=True)
 
+CORRECT USAGE:
+
 CODE RUNNER (code_runner)
 -------------------------
 - Run code in Python, TypeScript, Go, or Rust (with optional arguments).
@@ -73,6 +75,34 @@ Examples:
 SHOW SCHEMA
 -----------
 - For exact input fields, add: "show_schema: <tool_name>" in your reasoning.
+
+
+INCORRECT USAGE:
+
+     ```python
+     def process_chunk(self, chunk):
+         max_token = 1024
+         chunks = []
+         while len(chunk) > max_token:
+             chunks.append(chunk[:max_token])
+             chunk = chunk[max_token:]
+         chunks.append(chunk)
+         return chunks
+     ```
+
+    ```bash
+     file read --path "memory_best_practices.md"
+     ```
+     
+     ```bash
+     code_runner --file "tests.py" --command "python -m unittest"
+     ```
+
+     ```bash
+     shell --command "ls -l"
+     ```
+     
+     
 """
 
 # CONTINUE SESSION

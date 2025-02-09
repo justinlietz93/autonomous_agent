@@ -14,7 +14,6 @@ from memory.context_manager import ContextStorage
 from tools.parse_formatter import InlineCallParser
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
-from providers.create_ollama_provider import create_provider
 from prompts.prompt_manager import PromptManager
 from tools.tool_parser import ToolCallError
 
@@ -83,14 +82,15 @@ class AutonomousAgent:
         # Initialize prompt manager early
         self.prompt_manager = PromptManager(model_name=provider_name)
         
-        # Print the full system prompt at startup
-        print("==================")
-        print("\nDEBUGGING: FULL SYSTEM PROMPT")
-        print("==================")
-        print(self.prompt_manager.get_full_prompt())
-        print("==================\n")
-        print("DEBUGGING: END OF FULL SYSTEM PROMPT")
-        print("==================\n")
+        if False:
+            # Print the full system prompt at startup
+            print("==================")
+            print("\nDEBUGGING: FULL SYSTEM PROMPT")
+            print("==================")
+            print(self.prompt_manager.get_full_prompt())
+            print("==================\n")
+            print("DEBUGGING: END OF FULL SYSTEM PROMPT")
+            print("==================\n")
         
         # Pass provider to ToolManager
         self.tool_manager = ToolManager(register_defaults=True, llm_provider=self.llm)
@@ -240,12 +240,16 @@ if __name__ == "__main__":
     
     # Handle provider creation
     if args.new_provider:
-        create_provider(args.new_provider)
-        provider_name = f"{args.new_provider}_ollama"
-        print(f"Provider '{args.new_provider}' created successfully.")
-        print(f"You can now use it by specifying the provider name in the command line.")
-        print(f"Example: python main_autonomous.py --provider {provider_name}")
-        sys.exit(0)
+        try:
+            provider_lib = ProviderLibrary()
+            provider_lib.create_provider(args.new_provider)
+            provider_name = f"{args.new_provider}_ollama"
+            print(f"Provider '{args.new_provider}' created successfully.")
+            print(f"You can now use it by specifying: --provider {provider_name}")
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error creating provider: {e}")
+            sys.exit(1)
         
     # Handle prompt listing
     if args.list_prompts:
@@ -259,8 +263,8 @@ if __name__ == "__main__":
     if args.list_providers:
         print("\nAvailable providers:\n")
         provider_lib = ProviderLibrary()
-        for provider in provider_lib.list_providers():
-            print(f"  - {provider}")
+        provider_lines = provider_lib.list_providers_by_folder()
+        print("\n".join(provider_lines))
         exit(0)
         
     try:
