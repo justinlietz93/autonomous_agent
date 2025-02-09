@@ -38,26 +38,40 @@ class PromptManager:
     def _load_prompts(self) -> None:
         """Load all prompts recursively from the system_prompts directory and subdirectories."""
         prompts_dir = Path(__file__).parent / "system_prompts"
-        
-        # Recursively load each .py file in the system_prompts directory and subdirectories
+        self.prompt_folders = {}  # Reset or initialize (folder -> { prompt_name: prompt_text })
+        self.prompts = {}         # If you still want direct name->prompt_text (optional)
+
         for prompt_file in prompts_dir.rglob("*.py"):
             if prompt_file.stem.startswith("__"):
                 continue
-            
+
             try:
-                # Get relative path from prompts dir for module import
+                # The folder immediately under system_prompts
+                parent_folder = prompt_file.parent.name.upper()  # e.g. "SYSTEM_PROMPTS" or "BENCHMARKS"
+
+                # Build an import path for the module
                 rel_path = prompt_file.relative_to(prompts_dir)
-                # Convert path to module notation (/ -> .)
                 module_path = f"prompts.system_prompts.{str(rel_path.with_suffix('')).replace(os.sep, '.')}"
-                
-                # Import the module to get the PROMPT variable
+
                 module = __import__(module_path, fromlist=["PROMPT"])
                 if hasattr(module, "PROMPT"):
-                    # Extract prompt name from filename and path
                     prompt_name = prompt_file.stem.upper()
-                    self.prompts[prompt_name] = module.PROMPT
+                    prompt_text = module.PROMPT
+
+                    # Ensure we have a sub-dict for this folder
+                    if parent_folder not in self.prompt_folders:
+                        self.prompt_folders[parent_folder] = {}
+
+                    # Store the prompt text by [folder][prompt]
+                    self.prompt_folders[parent_folder][prompt_name] = prompt_text
+
+                    # Optional: also store it in self.prompts with just the prompt name
+                    # If you worry about collisions across folders, handle that carefully
+                    self.prompts[prompt_name] = prompt_text
+
             except Exception as e:
                 print(f"Warning: Failed to load prompt from {prompt_file}: {e}")
+
 
     def get_operating_system(self) -> str:
         """Get the operating system."""
@@ -77,6 +91,24 @@ class PromptManager:
         return sorted([p for p in self.prompts.keys() 
                       if p not in self.SYSTEM_PROMPTS])
     
+    def list_prompts_by_folder(self) -> list[str]:
+        """
+        Return a list of lines describing available prompts grouped by their parent folder.
+        """
+        lines = []
+
+        for folder_name in sorted(self.prompt_folders.keys()):
+            lines.append(folder_name)
+            lines.append("-" * 40)
+            prompt_names = sorted(self.prompt_folders[folder_name].keys())
+            for p_name in prompt_names:
+                lines.append(f"  - {p_name}")
+            lines.append("")  # blank line after each folder block
+
+        return lines
+
+
+
     def set_active_prompt(self, name: str) -> None:
         """Set the active prompt."""
         name = name.upper()  # Convert to uppercase for consistency

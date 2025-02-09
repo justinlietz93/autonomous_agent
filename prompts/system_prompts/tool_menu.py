@@ -61,18 +61,18 @@ SYSTEM
   Example: 
   computer("type", text="Hello World")
 
-SAVE MEMORY
-----------
-• continue_session
-  - Save progress and continue
-  Example: 
-      save_memory(
-      important_discoveries=["Discovery 1", "Discovery 2"],
-      completed_tasks=["Task 1"],
-      remaining_tasks=["Task 2"],
-      notes_for_future_self="This is an important reminder for future self",
-      next_step="Start Task 2"
-  )
-
 To get detailed schema for any tool, include "show_schema: tool_name" in your reasoning.
 """ 
+
+# SAVE MEMORY
+# ----------
+# • continue_session
+#   - Save progress and continue
+#   Example: 
+#       save_memory(
+#       important_discoveries=["Discovery 1", "Discovery 2"],
+#       completed_tasks=["Task 1"],
+#       remaining_tasks=["Task 2"],
+#       notes_for_future_self="This is an important reminder for future self",
+#       next_step="Start Task 2"
+#   )

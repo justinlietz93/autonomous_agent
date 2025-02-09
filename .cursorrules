@@ -65,6 +65,57 @@ LLM_kit/
 ```
 </CODEBASE_MAP>
 
+<TOOL_FORMAT>
+Our goal for the tool calls is that we want the LLM to call tools like this:
+
+web_search("latest advancements in AI", max_results=5)  
+code_runner("print('Checking system uptime')", language="python")  
+http_request("GET", "https://api.github.com/repos/justin/Samsung_4TB/github/LLM_kit/pulls")  
+package_manager("list")  
+file_read("/media/justin/Samsung_4TB/github/LLM_kit/current_status.md")  
+documentation_check("/media/justin/Samsung_4TB/github/LLM_kit/docs.md")  
+shell("df -h")  
+computer("type", text="System check complete")  
+file_write("/media/justin/Samsung_4TB/github/LLM_kit/log.txt", "Performed system and environment checks.")  
+web_browser("https://github.com/justin/Samsung_4TB/github/LLM_kit/issues", extract_links=True)  
+shell("echo 'Continuing operations'")  
+package_manager("install", "requests")  
+code_runner("import requests; print('Requests module loaded')", language="python")  
+http_request("GET", "https://api.github.com/repos/justin/Samsung_4TB/github/status")  
+file_delete("/media/justin/Samsung_4TB/github/LLM_kit/temp_file.txt")  
+shell("top -b -n1 | head -5")  
+web_search("efficient file management techniques", max_results=3)  
+code_runner("print('End of current session actions')", language="python")
+
+and our code will turn them into structured JSON tool calls to feed to the function executor like this
+
+TOOL_CALL: {
+    "tool": "file_tool",
+    "input_schema": {
+        "operation": "read",
+        "path": "README.md"
+    }
+}
+TOOL_CALL: {
+    "tool": "file_tool", 
+    "input_schema": {
+        "operation": "write",
+        "path": "test_output.txt",
+        "content": "This is a test file created by the tool parser test."
+    }
+}
+TOOL_CALL: {
+    "tool": "file_tool",
+    "input_schema": {
+        "operation": "read",
+        "path": "test_output.txt"
+    }
+}
+
+that will cause a function to be executed programmatically.
+
+</TOOL_FORMAT>
+
 
     <!-- ========================= -->
     <!-- CRITICAL WARNING SECTION -->

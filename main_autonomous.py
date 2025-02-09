@@ -98,9 +98,10 @@ class AutonomousAgent:
 
     def run(self):
         """
-        Run the autonomous loop indefinitely, processing responses
-        and avoiding repeated identical responses in a row.
+        Run the autonomous loop indefinitely, but now parse the LLM response
+        in real-time for TOOL_CALL: {...} blocks using RealTimeToolParser.
         """
+        parser = RealTimeToolParser(tools=self.tool_manager.tools, marker="TOOL_CALL:")
         last_response = ""
         repeat_count = 0
 
@@ -111,62 +112,91 @@ class AutonomousAgent:
             last_context = self._get_rolling_context(self.log_file, lines=50)
 
             step_prompt = f"""
-Current goal: {self.goal}.
+    Current goal: {self.goal}.
 
-Here is some context from your previous session (last 50 lines of logs):
-----------------------------------------
-{last_context}
-----------------------------------------
-End of previous context.
-----------------------------------------
+    Here is some context from your previous responses (last 50 lines of logs):
+    ----------------------------------------
+    {last_context}
+    ----------------------------------------
+    End of previous context.
 
-Immediately continue where you left off. 
-Do not stop until you have achieved your goal.
-You will have amnesia at the beginning of each session, so you must review the provided context 
-and use it to achieve your goal. You can also use tools to read the context files to refresh your memory.
-You should try to get as much as possible done in each session, even when you think you're done you must
-be even more thorough and quality oriented. You should run indefinitely.
+    Immediately continue where you left off. 
+    Do not stop until you have achieved your goal.
+    You will have amnesia at the beginning of each session, so you must review the provided context 
+    and use it to achieve your goal. You can also use tools to read the context files to refresh your memory.
+    You should try to get as much as possible done in each session, even when you think you're done you must
+    be even more thorough and quality oriented. You should run indefinitely.
 
-The main prompts do not know how far you've made it into your goal, so don't assume you're starting
-from scratch.
-"""
+    The main prompts do not know how far you've made it into your goal, so don't assume you're starting
+    from scratch.
+    """
 
             self.log("=== Next Step Prompt ===")
             self.log(step_prompt)
 
-            # Call the LLM for a single response
-            result = self.llm.run({
-                "messages": [
-                    {"content": self.prompt_manager.get_full_prompt()},
-                    {"content": step_prompt}
-                ]
-            })
+            # ------------------------------------------------------
+            # STREAMING CALL to the LLM - example if your provider supports .stream()
+            # ------------------------------------------------------
+            try:
+                stream_generator = self.llm.stream({
+                    "messages": [
+                        {"content": self.prompt_manager.get_full_prompt()},
+                        {"content": step_prompt}
+                    ]
+                })
+            except AttributeError:
+                # Fallback if streaming isn't supported by your provider
+                result = self.llm.run({
+                    "messages": [
+                        {"content": self.prompt_manager.get_full_prompt()},
+                        {"content": step_prompt}
+                    ]
+                })
+                # Just feed the entire text once - no true streaming
+                final_text = parser.feed(result["content"]["content"])
+                self.log("\n--- Your Previous Response ---")
+                self.log(final_text)
+                print("Sleeping for 3 seconds to avoid busy loop...")
+                import time
+                time.sleep(3)
+                continue
 
-            response_content = result["content"]["content"]
+            # If we do have a stream:
+            final_text = ""
+            for chunk in stream_generator:
+                chunk_text = chunk.get("response", "")  # Or however your model yields text
+                try:
+                    # Feed chunk text to RealTimeToolParser
+                    user_text = parser.feed(chunk_text)
+                    # Accumulate normal user-visible text
+                    final_text += user_text
 
-            # Check for repeated response
+                except ToolCallError as e:
+                    # The parser found a malformed tool call or tool execution error
+                    error_msg = f"\n[TOOL_CALL ERROR: {e.message}]\n"
+                    final_text += error_msg
+                    # Optionally log it or pass it back as "Self Correction"
 
-            if response_content == last_response:
+            # Once the stream ends, we have final_text containing 
+            # everything (minus tool calls, which were handled in real-time).
+            # You can now do repeated-response detection, logging, etc.
+
+            if final_text == last_response:
                 repeat_count += 1
             else:
                 repeat_count = 0
 
             if repeat_count >= 2:
-                # If we've repeated the exact same response multiple times,
-                # we add a small note to the LLM prompt to encourage a different result.
-                self.log("\n[NOTICE: LLM repeated same response multiple times. Adding note to break repetition.]\n")
-                response_content += "\n(LLM: Please provide new content, not the same as before.)"
-
-
-            # Now parse for potential tool calls:
-            final_text = detect_and_run_tools(response_content, self.tool_manager)
+                # If LLM repeated the exact same content multiple times, you can intervene
+                final_text += "\n(LLM: Please provide new content, not the same as before.)"
 
             self.log("\n--- Your Previous Response ---")
             self.log(final_text)
 
-            # Sleep a bit
             print("Sleeping for 3 seconds to avoid busy loop...")
+            import time
             time.sleep(3)
+
 
     def _suggest_new_goal(self) -> str:
         suggestions = [
@@ -209,14 +239,14 @@ if __name__ == "__main__":
     # Handle prompt listing
     if args.list_prompts:
         prompt_manager = PromptManager()
-        print("Available prompts:")
-        for prompt in prompt_manager.list_prompts():
-            print(f"  - {prompt}")
+        print("\nAvailable prompts:\n")
+        prompt_lines = prompt_manager.list_prompts_by_folder()
+        print("\n".join(prompt_lines))
         exit(0)
         
     # Handle provider listing
     if args.list_providers:
-        print("Available providers:")
+        print("\nAvailable providers:\n")
         provider_lib = ProviderLibrary()
         for provider in provider_lib.list_providers():
             print(f"  - {provider}")
