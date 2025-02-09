@@ -1,14 +1,14 @@
-# LLM_KIT/tools/web_search_tool.py
+# selfprompter/tools/web_search_tool.py
 """
 Web search tool implementation using direct HTTP requests and BeautifulSoup.
 Simpler approach without requiring external API keys.
+Acts like a web crawler, but driven and navigated by the LLM.
 """
 
 import requests
 from bs4 import BeautifulSoup
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from .tool_base import Tool
-from .types import ToolResult
 
 class WebSearchTool(Tool):
     """Tool for performing web searches via direct HTTP requests."""
@@ -39,13 +39,13 @@ class WebSearchTool(Tool):
                 "max_results": {
                     "type": "integer",
                     "description": "Maximum number of results to return",
-                    "default": 5
+                    "default": 3
                 }
             },
             "required": ["query"]
         }
 
-    def run(self, input: Dict[str, Any]) -> ToolResult:
+    def run(self, input: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute web search or fetch URL content.
         
@@ -60,7 +60,10 @@ class WebSearchTool(Tool):
         try:
             query = input.get("query")
             if not query:
-                return self.format_error("", "Error: Query is required")
+                return {
+                    "type": "tool_response",
+                    "content": "Error: Query is required"
+                }
 
             # If query is a URL, fetch it directly
             if query.startswith(('http://', 'https://')):
@@ -71,9 +74,12 @@ class WebSearchTool(Tool):
             return self._search(query, max_results)
 
         except Exception as e:
-            return self.format_error("", f"Error: {str(e)}")
+            return {
+                "type": "tool_response",
+                "content": f"Error: {str(e)}"
+            }
 
-    def _fetch_url(self, url: str) -> ToolResult:
+    def _fetch_url(self, url: str) -> Dict[str, Any]:
         """Fetch and extract content from a URL."""
         response = requests.get(url, headers=self.headers, timeout=10)
         response.raise_for_status()
@@ -90,9 +96,12 @@ class WebSearchTool(Tool):
         # Extract title
         title = soup.title.string if soup.title else ""
         
-        return self.format_result("", f"Title: {title}\n\nContent:\n{text[:1000]}...")  # Limit content length
+        return {
+            "type": "tool_response",
+            "content": f"Title: {title}\n\nContent:\n{text[:1000]}..."  # Limit content length
+        }
 
-    def _search(self, query: str, max_results: int) -> ToolResult:
+    def _search(self, query: str, max_results: int) -> Dict[str, Any]:
         """Perform a web search and return results."""
         # Start with known documentation URLs for Anthropic/Claude queries
         if "anthropic" in query.lower() or "claude" in query.lower():
@@ -117,10 +126,16 @@ class WebSearchTool(Tool):
                     continue
 
             if results:
-                return self.format_result("", self._format_results(results))
+                return {
+                    "type": "tool_response",
+                    "content": self._format_results(results)
+                }
 
         # Fallback message for other queries
-        return self.format_result("", "For non-Anthropic queries, please provide a specific URL to fetch content from.")
+        return {
+            "type": "tool_response",
+            "content": "For non-Anthropic queries, please provide a specific URL to fetch content from."
+        }
 
     def _format_results(self, results: List[Dict[str, str]]) -> str:
         """Format search results into readable text."""

@@ -1,1 +1,0 @@
-Creating current status documentation.

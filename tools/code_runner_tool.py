@@ -1,11 +1,8 @@
-# LLM_KIT/tools/code_runner_tool.py
+# selfprompter/tools/code_runner_tool.py
 
 import subprocess
 import os
-import json
-import shutil
 import tempfile
-import signal
 import sys
 import psutil
 from typing import Dict, Any, Optional, List, Literal, Union
@@ -227,13 +224,13 @@ class CodeRunnerTool(Tool):
 
             # Validate language
             if language not in self.language_configs:
-                return self.format_error("", f"Unsupported language: {language}")
+                return self._error(f"Unsupported language: {language}")
 
             config = self.language_configs[language]
             
             # Validate file extension
             if not main_file.endswith(config["file_ext"]):
-                return self.format_error("", f"File extension not valid for {language}")
+                return self._error(f"File extension not valid for {language}")
 
             # Create temporary project directory
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -258,9 +255,9 @@ class CodeRunnerTool(Tool):
                             )
                             print(f"Install result: {install_result.stdout}\n{install_result.stderr}")
                             if install_result.returncode != 0:
-                                return self.format_error("", f"Dependency installation failed: {install_result.stderr}")
+                                return self._error(f"Dependency installation failed: {install_result.stderr}")
                         except subprocess.TimeoutExpired:
-                            return self.format_error("", f"Dependency installation timed out after {timeout} seconds")
+                            return self._error(f"Dependency installation timed out after {timeout} seconds")
 
                     # Run build step if needed
                     if "build_cmd" in config:
@@ -275,9 +272,9 @@ class CodeRunnerTool(Tool):
                             )
                             print(f"Build result: {build_result.stdout}\n{build_result.stderr}")
                             if build_result.returncode != 0:
-                                return self.format_error("", f"Build failed: {build_result.stderr}")
+                                return self._error(f"Build failed: {build_result.stderr}")
                         except subprocess.TimeoutExpired:
-                            return self.format_error("", f"Build step timed out after {timeout} seconds")
+                            return self._error(f"Build step timed out after {timeout} seconds")
 
                     # Execute the main file
                     cmd = f"{config['run_cmd']} {main_file}"
@@ -297,16 +294,30 @@ class CodeRunnerTool(Tool):
                         )
                         print(f"Execution result: {result.stdout}\n{result.stderr}")
                         if result.returncode != 0:
-                            return self.format_error("", f"Execution failed: {result.stderr}")
+                            return self._error(f"Execution failed: {result.stderr}")
 
                         output = result.stdout.strip() or "Execution completed successfully (no output)"
-                        return self.format_result("", output)
+                        return self._success(output)
 
                     except subprocess.TimeoutExpired:
-                        return self.format_error("", f"Execution timed out after {timeout} seconds")
+                        return self._error(f"Execution timed out after {timeout} seconds")
 
                 except Exception as e:
-                    return self.format_error("", str(e))
+                    return self._error(f"Error: {str(e)}")
 
         except Exception as e:
-            return self.format_error("", str(e))
+            return self._error(str(e))
+
+    def _success(self, content: str) -> Dict[str, Any]:
+        return {
+            "type": "tool_response",
+            "tool_use_id": "",
+            "content": content
+        }
+        
+    def _error(self, message: str) -> Dict[str, Any]:
+        return {
+            "type": "tool_response",
+            "tool_use_id": "",
+            "content": f"Error: {message}"
+        }

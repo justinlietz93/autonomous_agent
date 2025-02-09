@@ -33,3 +33,5 @@ torch>=2.0.0  # Add this for the tokenizer
 watchdog==3.0.0  # For file watching
 protobuf>=4.25.1  # Required for tokenizer functionality
 ollama
+pytest-sugar
+
