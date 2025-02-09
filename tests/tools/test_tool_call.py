@@ -60,6 +60,8 @@ import json
 from typing import Dict, Any, AsyncGenerator
 from datetime import datetime
 import re
+import shlex
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parents[2]
@@ -87,176 +89,290 @@ class RealTimeToolParser:
     def __init__(self, tools):
         self.tools = tools
         self.buffer = ""
-        self.in_tool_call = False
-        
+        self.max_buffer = 1024 * 10  # 10KB max buffer size
+
     def feed(self, chunk: str) -> str:
-        """Feed a chunk of text to the parser and return any tool results."""
+        """Process a chunk of text and extract any tool calls."""
         self.buffer += chunk
-        result = ""
         
-        # Look for tool calls in the format: tool_name("arg1", arg2=value)
-        while True:
-            # Try to find a complete tool call
-            tool_call_match = re.search(r'(\w+)\((.*?)\)', self.buffer)
-            if not tool_call_match:
-                break
-                
-            tool_name = tool_call_match.group(1)
-            args_str = tool_call_match.group(2)
-            
-            try:
-                # Log the original LLM format
-                llm_format = f"{tool_name}({args_str})"
-                result += f"\nLLM FORMAT: {llm_format}\n"
+        # Don't process until we have a complete line or command
+        if not ('\n' in self.buffer or ')' in self.buffer):
+            return ""
+        
+        result = ""
+        lines = self.buffer.split('\n')
+        
+        # Process all complete lines except the last one
+        for line in lines[:-1]:
+            # Look for function call pattern: name(args)
+            match = re.match(r'(\w+)\((.*)\)', line.strip())
+            if match:
+                tool_name = match.group(1)
+                args_str = match.group(2)
                 
                 # Parse the arguments
-                args_dict = self._parse_args(args_str)
+                args = self._parse_args(args_str)
                 
-                # Convert to proper tool call format based on tool type
-                tool_call = self._format_tool_call(tool_name, args_dict)
+                # Map the tool name to the correct tool
+                tool_map = {
+                    "print": "code_runner",
+                    "code_runner": "code_runner", 
+                    "shell": "shell",
+                    "documentation_check": "documentation_check",
+                    "file_read": "file",
+                    "file_write": "file",
+                    "file_delete": "file",
+                    "web_search": "web_search",
+                    "web_browser": "web_browser",
+                    "http_request": "http_request",
+                    "package_manager": "package_manager"
+                }
                 
-                # Format as valid JSON string
-                tool_call_json = json.dumps(tool_call)
+                mapped_tool = tool_map.get(tool_name, tool_name)
                 
-                # Add the formatted tool call
-                result += f"TOOL_CALL: {tool_call_json}\n"
+                # Transform the args into the correct schema for each tool
+                input_schema = {}
                 
-                # Remove the processed tool call from buffer
-                self.buffer = self.buffer[tool_call_match.end():]
+                if mapped_tool == "code_runner":
+                    code = args["positional_args"][0] if args["positional_args"] else ""
+                    language = args.get("language", "python")
+                    input_schema = {
+                        "files": [{"path": "main.py", "content": code}],
+                        "main_file": "main.py",
+                        "language": language
+                    }
                 
-            except Exception as e:
-                raise ToolCallError(f"Error parsing tool call: {e}", context=llm_format)
+                elif mapped_tool == "file":
+                    if tool_name == "file_write":
+                        input_schema = {
+                            "operation": "write",
+                            "path": args["positional_args"][0],
+                            "content": args["positional_args"][1]
+                        }
+                    elif tool_name == "file_read":
+                        input_schema = {
+                            "operation": "read",
+                            "path": args["positional_args"][0]
+                        }
+                    elif tool_name == "file_delete":
+                        input_schema = {
+                            "operation": "delete",
+                            "path": args["positional_args"][0]
+                        }
+                    
+                elif mapped_tool == "shell":
+                    input_schema = {
+                        "command": args["positional_args"][0]
+                    }
                 
+                elif mapped_tool == "web_search":
+                    input_schema = {
+                        "query": args["positional_args"][0],
+                        "max_results": int(args.get("max_results", 5))
+                    }
+                
+                elif mapped_tool == "web_browser":
+                    input_schema = {
+                        "url": args["positional_args"][0],
+                        "extract_type": "links" if args.get("extract_links") else "text"
+                    }
+                
+                elif mapped_tool == "documentation_check":
+                    input_schema = {
+                        "path": args["positional_args"][0]
+                    }
+                
+                # Add the tool call to the result
+                tool_call = {
+                    "tool": mapped_tool,
+                    "input_schema": input_schema
+                }
+                result += f"TOOL_CALL: {json.dumps(tool_call)}\n"
+                
+        # Keep any incomplete line in the buffer
+        self.buffer = lines[-1]
+        
+        # Prevent buffer from growing too large
+        if len(self.buffer) > self.max_buffer:
+            self.buffer = self.buffer[-self.max_buffer:]
+        
+        return result
+
+    def _parse_args(self, args_str: str) -> Dict[str, Any]:
+        """
+        Parse a string like:
+            shell("df -h")
+            code_runner("print('Checking system uptime')", language="python")
+        into a dict with:
+            {
+              "positional_args": ["print('Checking system uptime')"],
+              "language": "python"
+            }
+        """
+        # We will collect all comma-separated chunks first,
+        # then if one has '=', we treat it as named_arg=value.
+        # Otherwise, it goes into a list under "positional_args".
+        result = {"positional_args": []}
+        parts = []
+        current = []
+        in_quotes = False
+        quote_char = None
+
+        for char in args_str:
+            if char in ('"', "'"):
+                if not in_quotes:
+                    in_quotes = True
+                    quote_char = char
+                elif char == quote_char:
+                    in_quotes = False
+                current.append(char)
+            elif char == ',' and not in_quotes:
+                parts.append(''.join(current).strip())
+                current = []
+            else:
+                current.append(char)
+        if current:
+            parts.append(''.join(current).strip())
+
+        # Now parse each part for name=value or just a positional
+        for i, part in enumerate(parts):
+            # For safety, remove surrounding quotes once at the end
+            part_stripped = part.strip()
+            if '=' in part_stripped:
+                # Named argument
+                key, val = part_stripped.split('=', 1)
+                key = key.strip()
+                # remove the outer quotes if any
+                val = val.strip().strip('"\'')
+                result[key] = val
+            else:
+                # Positional argument
+                # remove outer quotes if any
+                val = part_stripped.strip('"\'')
+                result["positional_args"].append(val)
+
         return result
 
     def _format_tool_call(self, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Format the tool call based on the tool type."""
-        # Map tool names to their actual registered names
+        """
+        Convert a function name + parsed args into the correct tool + input_schema
+        for our system. We'll do custom logic for each recognized tool.
+        """
+        # 1) Map the function name to an actual tool key
         tool_name_map = {
+            "print": "code_runner",
+            "code_runner": "code_runner",
+            "shell": "shell",
+            "documentation_check": "documentation_check",
             "file_read": "file",
-            "file_write": "file", 
+            "file_write": "file",
             "file_delete": "file",
             "web_search": "web_search",
             "web_browser": "web_browser",
-            "code_runner": "code_runner",
-            "shell": "shell",
-            "documentation_check": "documentation_check"
+            "http_request": "http_request",  # If you have an "http_request" key in your tools
+            "package_manager": "package_manager"
+            # ... add any other mappings needed ...
         }
+        base_tool = tool_name_map.get(tool_name, tool_name)
 
+        # The final JSON to return
         tool_call = {
-            "tool": tool_name_map.get(tool_name, tool_name),  # Use mapped name or original
+            "tool": base_tool,
             "input_schema": {}
         }
-        
-        # Handle file operations
-        if tool_name == "file_read":
-            tool_call["input_schema"] = {
-                "operation": "read",
-                "path": args["input"]
-            }
-        elif tool_name == "file_write":
-            # Split on first comma that's not inside quotes
-            parts = []
-            current = ""
-            in_quotes = False
-            quote_char = None
-            
-            for char in args["input"]:
-                if char in '"\'':
-                    if not in_quotes:
-                        in_quotes = True
-                        quote_char = char
-                    elif char == quote_char:
-                        in_quotes = False
-                elif char == ',' and not in_quotes:
-                    parts.append(current)
-                    current = ""
-                    continue
-                current += char
-            
-            if current:
-                parts.append(current)
-                
-            if len(parts) == 2:
-                tool_call["input_schema"] = {
-                    "operation": "write",
-                    "path": parts[0].strip().strip('"\''),
-                    "content": parts[1].strip().strip('"\'')
-                }
+
+        # convenience
+        pos_args = args.get("positional_args", [])
+
+        # 2) Depending on which tool, rearrange the arguments properly
+        if base_tool == "file":
+            # figure out if it's read/write/delete
+            # we can deduce from the original tool name
+            if "write" in tool_name:
+                operation = "write"
+            elif "read" in tool_name:
+                operation = "read"
             else:
-                tool_call["input_schema"] = {
-                    "operation": "write",
-                    "path": args["input"],
-                    "content": args.get("content", "")
-                }
-        elif tool_name == "file_delete":
+                operation = "delete"
+            path = pos_args[0] if len(pos_args) > 0 else ""
+            content = pos_args[1] if len(pos_args) > 1 else ""
+
             tool_call["input_schema"] = {
-                "operation": "delete",
-                "path": args["input"]
+                "operation": operation,
+                "path": path,
+                "content": content
             }
-        # Handle shell commands
-        elif tool_name == "shell":
+
+        elif base_tool == "code_runner":
+            # For code_runner, we want:
+            # "files": [{"path": "main.py", "content": <code>}],
+            # "main_file": "main.py",
+            # "language": <args["language"] or "python">
+            code_str = pos_args[0] if len(pos_args) > 0 else ""
+            language = args.get("language", "python")
             tool_call["input_schema"] = {
-                "command": args["input"]
+                "files": [{"path": "main.py", "content": code_str}],
+                "main_file": "main.py",
+                "language": language
             }
-        # Handle code runner
-        elif tool_name == "code_runner":
+
+        elif base_tool == "shell":
+            # shell("df -h")
+            # => {"command": "df -h"}
+            command_str = pos_args[0] if len(pos_args) > 0 else ""
+            tool_call["input_schema"] = {"command": command_str}
+
+        elif base_tool == "documentation_check":
+            # documentation_check("docs.md")
+            # => {"path": "docs.md"} or if there's more logic for check_type
+            path_str = pos_args[0] if len(pos_args) > 0 else ""
+            tool_call["input_schema"] = {"path": path_str}
+            # Optionally handle named arguments
+
+        elif base_tool == "web_search":
+            # web_search("some query", max_results=3)
+            query = pos_args[0] if len(pos_args) > 0 else ""
+            max_results = int(args.get("max_results", 5))
             tool_call["input_schema"] = {
-                "code": args["input"],
-                "language": args.get("language", "python")
+                "query": query,
+                "max_results": max_results
             }
-        # Handle web operations
-        elif tool_name == "web_search":
+
+        elif base_tool == "web_browser":
+            # web_browser("https://github.com", extract_links=True)
+            url = pos_args[0] if len(pos_args) > 0 else ""
+            extract_links = args.get("extract_links", False)
+            # or you can store it as "extract_type": "links"
             tool_call["input_schema"] = {
-                "query": args["input"],
-                "max_results": int(args.get("max_results", 5))
+                "url": url,
+                "extract_type": "links" if extract_links else "text"
             }
-        elif tool_name == "web_browser":
+
+        elif base_tool == "http_request":
+            # http_request("GET", "https://api.github.com/repos/.../pulls")
+            method = pos_args[0] if len(pos_args) > 0 else "GET"
+            url = pos_args[1] if len(pos_args) > 1 else ""
+            # you can also pass data, headers, etc.
             tool_call["input_schema"] = {
-                "url": args["input"],
-                "extract_links": args.get("extract_links", False)
+                "method": method,
+                "url": url
             }
-        # Default case - pass args directly
+
+        elif base_tool == "package_manager":
+            # package_manager("install", "requests")
+            action = pos_args[0] if len(pos_args) > 0 else "install"
+            package = pos_args[1] if len(pos_args) > 1 else ""
+            tool_call["input_schema"] = {
+                "action": action,
+                "package": package
+            }
+
         else:
+            # Default: Just pass all named fields
             tool_call["input_schema"] = args
-            
+
         return tool_call
 
-    def _parse_args(self, args_str: str) -> Dict[str, Any]:
-        """Parse tool call arguments into a dictionary."""
-        # Remove quotes from string arguments
-        args_str = re.sub(r'"([^"]*)"', r'\1', args_str)
-        args_str = re.sub(r"'([^']*)'", r'\1', args_str)
-        
-        # Split on commas not inside function calls
-        args_parts = []
-        current = ""
-        paren_count = 0
-        
-        for char in args_str:
-            if char == '(':
-                paren_count += 1
-            elif char == ')':
-                paren_count -= 1
-            elif char == ',' and paren_count == 0:
-                args_parts.append(current.strip())
-                current = ""
-                continue
-            current += char
-            
-        if current:
-            args_parts.append(current.strip())
-            
-        # Convert to dictionary
-        args_dict = {}
-        for part in args_parts:
-            if '=' in part:
-                key, value = part.split('=', 1)
-                args_dict[key.strip()] = value.strip()
-            else:
-                args_dict['input'] = part.strip()
-                
-        return args_dict
 
 # Define test sandbox directory
 SANDBOX_DIR = Path("/media/justin/Samsung_4TB/github/LLM_kit/tests/tools/tool_sandbox")
@@ -268,27 +384,30 @@ SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
 SAMPLE_RESPONSES = [
     """I'll perform a series of system checks and operations.
 
-First, let me search for relevant information:
-web_search("latest advancements in AI", max_results=5)
-
 Now let's check system status:
 code_runner("print('Checking system uptime')", language="python")
 
+Writing log entry:
+file_write("current_status.md", "Creating current status documentation.")
+
+Writing log entry:
+file_write("docs.md", "Creating LLM documentation.")
+
 Reading current status:
-file_read("/media/justin/Samsung_4TB/github/LLM_kit/tests/tools/tool_sandbox/current_status.md")
+file_read("current_status.md")
 
 Validating documentation:
-documentation_check("/media/justin/Samsung_4TB/github/LLM_kit/tests/tools/tool_sandbox/docs.md")
+documentation_check("docs.md")
 
 Checking disk space:
 shell("df -h")
 
 Writing log entry:
-file_write("/media/justin/Samsung_4TB/github/LLM_kit/tests/tools/tool_sandbox/log.txt", "Performed system and environment checks.")
+file_write("test_log.txt", "Performed system and environment checks.")
 """,
 
     """Now let's perform some web operations:
-web_browser("https://github.com/justin/Samsung_4TB/github/LLM_kit/issues", extract_links=True)
+web_browser("https://github.com", extract_links=True)
 
 Continuing with system operations:
 shell("echo 'Continuing operations'")
@@ -297,10 +416,10 @@ Testing installed package:
 code_runner("import requests; print('Requests module loaded')", language="python")
 
 Cleanup operations:
-file_delete("/media/justin/Samsung_4TB/github/LLM_kit/tests/tools/tool_sandbox/temp_file.txt")
+file_delete("test_log.txt")
 
 Final research:
-web_search("efficient file management techniques", max_results=3)
+web_search("https://github.com", max_results=3)
 """
 ]
 
@@ -347,6 +466,36 @@ def cleanup_sandbox():
                     shutil.rmtree(item)
             except Exception as e:
                 print(f"Warning: Could not remove {item}: {e}")
+
+def validate_and_sanitize_input(tool_name, args):
+    # New validation logic
+    if tool_name == "code_runner":
+        if 'code' not in args:
+            raise ValueError("Code parameter required")
+        args['code'] = args['code'].strip().replace('\n', '\\n')
+        
+    elif tool_name == "file":
+        if 'operation' not in args:
+            raise ValueError("Operation parameter required")
+        if args['operation'] == 'write' and 'content' not in args:
+            raise ValueError("Content parameter required for write operations")
+            
+    elif tool_name == "shell":
+        if 'command' not in args:
+            raise ValueError("Command parameter required")
+        args['command'] = shlex.quote(args['command'])
+    
+    elif tool_name == "documentation_check":
+        if 'path' not in args:
+            if 'input' in args:
+                args['path'] = args['input']
+            else:
+                raise ValueError("Path parameter required")
+        # Validate path exists
+        if not Path(args['path']).exists():
+            raise ValueError(f"Documentation path not found: {args['path']}")
+    
+    return args
 
 def test_tool_execution():
     """Test the tool parser with real tool execution."""
@@ -452,4 +601,4 @@ def main():
         print(f"Test failed: {e}")
 
 if __name__ == "__main__":
-    main() 
+    main()
