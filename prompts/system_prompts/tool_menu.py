@@ -1,78 +1,87 @@
-"""Tool menu prompt."""
-
 PROMPT = """
-Available Tools:
----------------
+TOOL MENU
+=========
 
-FILE OPERATIONS
---------------
-• file_tool
-  - Read, write, and edit files (including code or any other text)
-  Examples: 
-  file_read("/media/justin/Samsung_4TB/github/LLM_kit/README.md")
-  file_write("/media/justin/Samsung_4TB/github/LLM_kit/output.txt", "Hello World")
-  file_delete("/media/justin/Samsung_4TB/github/LLM_kit/output.txt")
+!! WARNING: CRITICAL NOTICE !!
 
-DOCUMENTATION
-------------
-• documentation_check
-  - Validate and check documentation
-  Example: documentation_check("path/to/doc.md")
+IT IS CRUCIAL THAT YOU FOLLOW THE EXACT TOOL CALL FORMATTING.
+INCORRECT TOOL CALLS WILL CAUSE THE SYSTEM TO FAIL.
 
-WEB & SEARCH
+!! WARNING: CRITICAL NOTICE !!
+
+FILE (file)
 -----------
-• web_search
-  - Search web and extract information
-  Example: 
-  web_search("python documentation", max_results=5)
+- Use for reading, writing, editing, deleting, or managing directories/files.
+Examples (bridging format):
+  file_read("notes.txt")
+  file_write("notes.txt", "New content")
+  file_delete("oldfile.txt")
+  file("append", "log.txt", "Additional text")
+  file("list_dir", "/some/folder", recursive=True)
 
-• web_browser
-  - Fetch and parse web pages
-  Example: 
-  web_browser("https://docs.python.org", extract_type="text")
+CODE RUNNER (code_runner)
+-------------------------
+- Run code in Python, TypeScript, Go, or Rust (with optional arguments).
+Example:
+  code_runner("print('Hello')", language="python")
 
-• http_request
-  - Make HTTP requests
-  Example: 
+COMPUTER (computer)
+-------------------
+- Interact with the system’s UI, check hardware info, or take screenshots.
+Examples:
+  computer("system_info")
+  computer("screenshot")
+
+DOCUMENTATION CHECK (documentation_check)
+----------------------------------------
+- Validate local docs or check external doc sites.
+Example:
+  documentation_check("docs/readme.md")
+
+WEB SEARCH (web_search)
+-----------------------
+- Search or fetch info from a URL.
+Examples:
+  web_search("latest python docs", max_results=3)
+  web_search("https://example.com")
+
+WEB BROWSER (web_browser)
+-------------------------
+- Fetch a webpage with optional extraction of text, links, or title.
+Example:
+  web_browser("https://docs.python.org", extract_links=True)
+
+HTTP REQUEST (http_request)
+---------------------------
+- Make GET/POST/PUT/DELETE requests, optionally including headers/data.
+Example:
   http_request("GET", "https://api.example.com/data")
 
-DEVELOPMENT
-----------
-• code_runner
-  - Execute code in various languages (python, bash, etc.)
-  Example: 
-  code_runner("print('hello')", language="python")
+SHELL (shell)
+-------------
+- Execute shell commands with optional timeout or working directory.
+Example:
+  shell("ls -al")
 
-• package_manager
-  - Manage Python packages with pip
-  Example: 
-  package_manager("list")
+PACKAGE MANAGER (package_manager)
+---------------------------------
+- Install, list, or uninstall Python packages.
+Examples:
   package_manager("install", "requests")
+  package_manager("list")
 
-SYSTEM
-------
-• shell
-  - Execute shell commands
-  Example: 
-  shell("ls -l")
+SHOW SCHEMA
+-----------
+- For exact input fields, add: "show_schema: <tool_name>" in your reasoning.
+"""
 
-• computer
-  - Control mouse, keyboard, windows
-  Example: 
-  computer("type", text="Hello World")
-
-To get detailed schema for any tool, include "show_schema: tool_name" in your reasoning.
-""" 
-
-# SAVE MEMORY
-# ----------
-# • continue_session
-#   - Save progress and continue
-#   Example: 
-#       save_memory(
-#       important_discoveries=["Discovery 1", "Discovery 2"],
-#       completed_tasks=["Task 1"],
-#       remaining_tasks=["Task 2"],
-#       notes_for_future_self="This is an important reminder for future self",
-#       next_step="Start Task 2"
+# CONTINUE SESSION
+# ----------------
+# - Save progress for future steps.
+# Example:
+#   continue_session(
+#     completed_tasks=["Task1"],
+#     remaining_tasks=["Task2"],
+#     context_summary="Key highlights",
+#     next_step="Move on to next tasks"
 #   )

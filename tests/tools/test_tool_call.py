@@ -161,14 +161,20 @@ class RealTimeToolParser:
                         }
                     
                 elif mapped_tool == "shell":
-                    input_schema = {
-                        "command": args["positional_args"][0]
-                    }
+                    # Fix: Ensure shell command has proper quote handling
+                    command = args["positional_args"][0]
+                    # If command starts with a quote but doesn't end with one, add it
+                    if (command.startswith("'") and not command.endswith("'")) or \
+                       (command.startswith('"') and not command.endswith('"')):
+                        command = command + command[0]  # Add matching quote
+                    input_schema = {"command": command}
                 
                 elif mapped_tool == "web_search":
+                    query = args["positional_args"][0]
+                    max_results = int(args.get("max_results", 5))
                     input_schema = {
-                        "query": args["positional_args"][0],
-                        "max_results": int(args.get("max_results", 5))
+                        "query": query,
+                        "max_results": max_results
                     }
                 
                 elif mapped_tool == "web_browser":
@@ -394,6 +400,7 @@ Writing log entry:
 file_write("docs.md", "Creating LLM documentation.")
 
 Reading current status:
+
 file_read("current_status.md")
 
 Validating documentation:
@@ -513,7 +520,7 @@ def test_tool_execution():
             "web_search": WebSearchTool(),
             "code_runner": CodeRunnerTool(),
             "file": FileTool(),  # Note: file_read/write/delete use this
-            "documentation_check": DocCheckTool(),
+            "documentation_check": DocCheckTool(docs_root=str(SANDBOX_DIR)),
             "shell": ShellTool(),
             "web_browser": WebBrowserTool()
         }

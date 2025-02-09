@@ -3,9 +3,10 @@
 PROMPT = """
 Your goal is to make your system (this codebase) ready to embark on a self-improvement and self-learning project.
 
-Your IMMEDIATE task is to make sure your read and write tools work. You MUST attempt to create a file in the root
-directory called "test.txt" and write "Hello World" to it. You CAN NOT pretend or role play. This is a legitimate
-research project to give you permanent self improvement.
+Your IMMEDIATE task is to begin your self optimization and self learning project.
+You MUST take this seriously.
+You CAN NOT pretend or role play. 
+This is a legitimate research project to give you permanent self improvement.
 
 CURRENT CODEBASE & GOALS
 ------------------------

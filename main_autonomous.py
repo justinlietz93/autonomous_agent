@@ -10,11 +10,12 @@ from typing import Dict, Any
 import string  # Add to imports at top
 
 from memory.context_manager import ContextStorage
+from tools.parse_formatter import InlineCallParser
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
 from providers.create_ollama_provider import create_provider
 from prompts.prompt_manager import PromptManager
-from tools.tool_parser import RealTimeToolParser, ToolCallError
+from tools.tool_parser import ToolCallError
 
 
 # Update argument parsing
@@ -101,7 +102,7 @@ class AutonomousAgent:
         Run the autonomous loop indefinitely, but now parse the LLM response
         in real-time for TOOL_CALL: {...} blocks using RealTimeToolParser.
         """
-        parser = RealTimeToolParser(tools=self.tool_manager.tools, marker="TOOL_CALL:")
+        parser = InlineCallParser(self.tool_manager.tools, marker="TOOL_CALL:")
         last_response = ""
         repeat_count = 0
 
