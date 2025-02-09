@@ -49,9 +49,20 @@ Example:
 ollama run deepseek-r1:32b
 ```
 
+### 6. Single Response Mode
+```bash
+python main_autonomous.py --single
+# or
+python main_autonomous.py -s
+```
+Runs in single response mode instead of autonomous loop. Useful for quick tests or one-off queries.
 
+You can combine this with other flags:
+```bash
+python main_autonomous.py --provider deepseek-r1_api --prompt DEBUG --single
+```
 
-### 6. Default Usage
+### 7. Default Usage
 ```bash
 python main_autonomous.py
 ```
@@ -74,10 +85,16 @@ This will use the default provider (deepseek_ollama) and default prompt (SELF_OP
    python main_autonomous.py -p phi4_ollama
    ```
 
+4. Quick test with single response:
+   ```bash
+   python main_autonomous.py -p deepseek-r1_api --single
+   ```
+
 ## Currently Available Providers
 - `deepseek_ollama` (32b model)
 - `deepseek-14b_ollama` (14b model)
 - `phi4_ollama`
+- `deepseek-r1_api` (API provider)
 
 ## Testing Prompts
 

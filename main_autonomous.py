@@ -34,6 +34,9 @@ def parse_args():
     parser.add_argument('--list-prompts',
                        action='store_true',
                        help='List available prompts and exit')
+    parser.add_argument('--single', '-s',
+                       action='store_true',
+                       help='Run in single response mode instead of autonomous loop')
     return parser.parse_args()
 
 def detect_and_run_tools(response_text: str, tool_manager) -> str:
@@ -69,7 +72,7 @@ def detect_and_run_tools(response_text: str, tool_manager) -> str:
 
 
 class AutonomousAgent:
-    def __init__(self, provider_name: str = 'deepseek_ollama'):
+    def __init__(self, provider_name: str = 'deepseek_ollama', single_mode: bool = False):
         self.context_storage = ContextStorage(storage_dir="memory/context_logs")
         
         # Initialize provider first
@@ -107,12 +110,29 @@ class AutonomousAgent:
         timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.log_file = os.path.join("memory", "context_logs", f"context_{timestamp_str}_{self.session_id}.txt")
 
+        self.single_mode = single_mode
+
     def run(self):
-        """
-        Run the autonomous loop indefinitely, but now parse the LLM response
-        in real-time for TOOL_CALL: {...} blocks using RealTimeToolParser.
-        """
+        """Run the agent in either autonomous or single response mode."""
         parser = InlineCallParser(self.tool_manager.tools, marker="TOOL_CALL:")
+
+        # For single mode, we don't need context or goals
+        if self.single_mode:
+            try:
+                response = self.llm.run({
+                    "messages": [
+                        {"content": self.prompt_manager.get_full_prompt()}
+                    ]
+                })
+                final_text = parser.feed(response["content"]["content"])
+                print(final_text)
+                print("\nEnd of response.")
+                return
+            except Exception as e:
+                print(f"Error: {e}")
+                return
+
+        # Regular autonomous mode
         last_response = ""
         repeat_count = 0
 
@@ -208,7 +228,6 @@ class AutonomousAgent:
             import time
             time.sleep(3)
 
-
     def _suggest_new_goal(self) -> str:
         suggestions = [
             "Manually write a new prompt for yourself in the prompts folder and set that as the default prompt."
@@ -268,7 +287,10 @@ if __name__ == "__main__":
         exit(0)
         
     try:
-        agent = AutonomousAgent(provider_name=args.provider)
+        agent = AutonomousAgent(
+            provider_name=args.provider,
+            single_mode=args.single
+        )
         if args.prompt:
             agent.prompt_manager.set_active_prompt(args.prompt)
         agent.run()
