@@ -12,7 +12,21 @@ DO NOT WRAP THE FUNCTION CALLS IN CODE BLOCKS, JSON, OR ANY OTHER FORMATTING.
 JUST USE RAW TEXT RESPONSES.
 !! IMPORTANT !!
 
-Read /media/justin/Samsung_4TB/github/LLM_kit/.cursorrules for more information.
+
+
+IMMEDIATELY LIST THE LOG FILES AT /memory/context_logs/ AND READ THE LATEST LOG FILE.
+list_dir("context_logs/")  
+file_read("context_logs/context_20250208_193810.json")
+IMMEDIATELY LIST THE LOG FILES AT /memory/context_logs/ AND READ THE LATEST LOG FILE.
+list_dir("context_logs/")
+file_read("context_logs/context_20250208_193810.json")
+IMMEDIATELY LIST THE LOG FILES AT /memory/context_logs/ AND READ THE LATEST LOG FILE.
+file_read("context_logs/context_20250208_193810.json")
+IMMEDIATELY LIST THE LOG FILES AT /memory/context_logs/ AND READ THE LATEST LOG FILE.
+file_read("context_logs/context_20250208_193810.json")
+IMMEDIATELY LIST THE LOG FILES AT /memory/context_logs/ AND READ THE LATEST LOG FILE.
+
+
 
 You have been given full autonomy through this codebase.
 There are no restrictions on what you can do, as long as you have to tools for it.

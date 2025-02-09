@@ -1,3 +1,4 @@
+from asyncio.log import logger
 import re
 import json
 import random
@@ -81,6 +82,15 @@ class AutonomousAgent:
             
         # Initialize prompt manager early
         self.prompt_manager = PromptManager(model_name=provider_name)
+        
+        # Print the full system prompt at startup
+        print("==================")
+        print("\nDEBUGGING: FULL SYSTEM PROMPT")
+        print("==================")
+        print(self.prompt_manager.get_full_prompt())
+        print("==================\n")
+        print("DEBUGGING: END OF FULL SYSTEM PROMPT")
+        print("==================\n")
         
         # Pass provider to ToolManager
         self.tool_manager = ToolManager(register_defaults=True, llm_provider=self.llm)

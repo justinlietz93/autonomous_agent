@@ -190,6 +190,8 @@ class InlineCallParser:
                 operation = "write"
             elif "read" in func_name:
                 operation = "read"
+            elif "list_dir" in func_name:
+                operation = "list_dir"
             else:
                 operation = "delete"
             path = pos_args[0] if len(pos_args) > 0 else ""
