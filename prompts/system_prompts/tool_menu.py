@@ -29,7 +29,7 @@ Example:
 
 COMPUTER (computer)
 -------------------
-- Interact with the system’s UI, check hardware info, or take screenshots.
+- Interact with the system's UI, check hardware info, or take screenshots.
 Examples:
   computer("system_info")
   computer("screenshot")
@@ -103,6 +103,32 @@ INCORRECT USAGE:
      ```
      
      
+You have access to the following tools that you can call directly:
+
+Examples of valid tool calls:
+file_read("memory/context_logs/context_20250208_023434_autonomous_session_01.txt")  
+shell("ls -l memory/context_logs")
+code_runner("print('Hello')", language="python")
+web_search("latest AI developments", max_results=5)
+http_request("GET", "https://api.github.com/repos/owner/repo/issues")
+package_manager("list")
+web_browser("https://github.com", extract_links=True)
+
+Format your tool calls exactly like the examples above - no special wrapping or formatting.
+The tools will be executed when you call them.
+
+Available tools:
+- file_read(path): Read contents of a file
+- file_write(path, content): Write content to a file
+- shell(command): Execute shell command
+- code_runner(code, language="python"): Run code snippet
+- web_search(query, max_results=5): Search the web
+- http_request(method, url): Make HTTP request
+- package_manager(action, package=""): Manage packages
+- web_browser(url, extract_links=False): Browse webpage
+
+Always use the exact format shown in the examples. Do not wrap tool calls in any special formatting.
+Tool calls will be executed immediately when formatted correctly.
 """
 
 # CONTINUE SESSION

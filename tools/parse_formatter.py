@@ -172,14 +172,21 @@ class InlineCallParser:
             output_text = ""
 
             while True:
-                match = re.search(r'(\w+)\(', self.buffer)
+                # Updated pattern to be more precise about tool calls
+                match = re.search(r'(?:^|\s+)(\w+)\s*\(', self.buffer, re.MULTILINE)
                 if not match:
                     break
 
-                func_name = match.group(1)  # e.g. "shell"
+                func_name = match.group(1)
+                if func_name not in self.TOOL_NAME_MAP:
+                    # Not a valid tool name - skip it
+                    output_text += self.buffer[:match.end()]
+                    self.buffer = self.buffer[match.end():]
+                    continue
+
                 start_index = match.start()
 
-                # We want to find the matching closing parenthesis. We'll track nesting level
+                # We need to find the matching closing parenthesis
                 paren_level = 1
                 i = match.end()
                 while i < len(self.buffer) and paren_level > 0:
@@ -190,8 +197,7 @@ class InlineCallParser:
                     i += 1
 
                 if paren_level != 0:
-                    # We didn't find a matching ')', means we need more text
-                    # So we just return for now; we'll parse more on the next chunk
+                    # Didn't find closing paren - need more text
                     return ""
 
                 # We have the entire substring: funcName(...) from start_index to i
@@ -292,94 +298,87 @@ class InlineCallParser:
 
         try:
             if mapped_tool == "file":
+                # Map file operations to correct format
+                operation = "read"  # default
                 if "write" in func_name:
                     operation = "write"
-                elif "read" in func_name:
-                    operation = "read"
+                elif "delete" in func_name:
+                    operation = "delete"
                 elif "list_dir" in func_name:
                     operation = "list_dir"
-                else:
-                    operation = "delete"
-                path = pos_args[0] if len(pos_args) > 0 else ""
-                content = pos_args[1] if len(pos_args) > 1 and operation == "write" else ""
 
                 input_schema = {
                     "operation": operation,
-                    "path": path,
-                    "content": content
+                    "path": pos_args[0] if pos_args else "",
                 }
+                if operation == "write" and len(pos_args) > 1:
+                    input_schema["content"] = pos_args[1]
                 
             elif mapped_tool == "code_runner":
-                code_str = pos_args[0] if len(pos_args) > 0 else ""
-                language = args.get("language", "python")
+                # Format code runner calls
+                code_str = pos_args[0] if pos_args else ""
                 input_schema = {
                     "files": [{"path": "main.py", "content": code_str}],
                     "main_file": "main.py",
-                    "language": language
+                    "language": args.get("language", "python")
                 }
                 
             elif mapped_tool == "shell":
-                command_str = pos_args[0] if len(pos_args) > 0 else ""
-                input_schema = {"command": command_str}
-
-            elif mapped_tool == "documentation_check":
-                path_str = pos_args[0] if len(pos_args) > 0 else ""
-                input_schema = {"path": path_str}
+                # Format shell commands
+                input_schema = {
+                    "command": pos_args[0] if pos_args else ""
+                }
 
             elif mapped_tool == "web_search":
-                query = pos_args[0] if len(pos_args) > 0 else ""
-                max_results = int(args.get("max_results", 5))
+                # Format web search queries
                 input_schema = {
-                    "query": query,
-                    "max_results": max_results
+                    "query": pos_args[0] if pos_args else "",
+                    "max_results": int(args.get("max_results", 5))
                 }
 
             elif mapped_tool == "web_browser":
-                url = pos_args[0] if len(pos_args) > 0 else ""
-                extract_links = args.get("extract_links", False)
+                # Format web browser requests
                 input_schema = {
-                    "url": url,
-                    "extract_type": "links" if extract_links else "text"
+                    "url": pos_args[0] if pos_args else "",
+                    "extract_type": "links" if args.get("extract_links", False) else "text"
                 }
 
             elif mapped_tool == "http_request":
-                method = pos_args[0] if len(pos_args) > 0 else "GET"
-                url = pos_args[1] if len(pos_args) > 1 else ""
+                # Format HTTP requests
                 input_schema = {
-                    "method": method,
-                    "url": url
+                    "method": pos_args[0] if pos_args else "GET",
+                    "url": pos_args[1] if len(pos_args) > 1 else ""
                 }
 
             elif mapped_tool == "package_manager":
-                action = pos_args[0] if len(pos_args) > 0 else "install"
-                package = pos_args[1] if len(pos_args) > 1 else ""
+                # Format package manager commands
                 input_schema = {
-                    "action": action,
-                    "package": package
+                    "action": pos_args[0] if pos_args else "list",
+                    "package": pos_args[1] if len(pos_args) > 1 else ""
                 }
 
             elif mapped_tool == "memory":
+                # Format memory operations
+                operation = "read"  # default
                 if "write" in func_name:
                     operation = "write"
-                elif "read" in func_name:
-                    operation = "read"
-                else:
+                elif "list" in func_name:
                     operation = "list"
-                    
-                key = pos_args[0] if len(pos_args) > 0 else ""
-                value = pos_args[1] if len(pos_args) > 1 and operation == "write" else ""
-                
+
                 input_schema = {
                     "operation": operation,
-                    "key": key,
-                    "value": value
+                    "key": pos_args[0] if pos_args else "",
                 }
+                if operation == "write" and len(pos_args) > 1:
+                    input_schema["value"] = pos_args[1]
 
             else:
-                # default
-                input_schema = args
+                # For any other tool, pass args directly
+                input_schema = {k: v for k, v in args.items() if k != "positional_args"}
+                if pos_args:
+                    input_schema["args"] = pos_args
 
-            # Validate the input schema before returning
+            # Validate before returning
             self.validate_input(mapped_tool, input_schema)
             tool_call["input_schema"] = input_schema
             
