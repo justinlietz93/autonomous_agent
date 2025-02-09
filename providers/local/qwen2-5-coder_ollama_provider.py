@@ -6,6 +6,7 @@
 
 import ollama
 from typing import Dict, Any
+from providers.utils.throbber import Throbber
 from tools.tool_base import Tool
 
 class Qwen25CoderProvider(Tool):
@@ -30,11 +31,17 @@ class Qwen25CoderProvider(Tool):
         try:
             prompt = "\n".join(msg["content"] for msg in params["messages"])
             print("\nStarting Ollama stream...")
+
+            throbber = Throbber()
+            throbber.start()
+
             response = ollama.generate(
                 model="qwen2.5-coder",
                 prompt=prompt,
                 stream=True
             )
+            throbber.stop()
+
             full_response = ""
             for chunk in response:
                 text_piece = chunk.get("response", "")
@@ -49,6 +56,8 @@ class Qwen25CoderProvider(Tool):
                 }
             }
         except Exception as e:
+            if 'throbber' in locals():
+                throbber.stop()
             print(f"Ollama error => {str(e)}")
             return {
                 "type": "tool_result",

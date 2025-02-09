@@ -1,7 +1,13 @@
-from typing import Dict, Any, Optional, AsyncGenerator
+from typing import Dict, Any, Optional, AsyncGenerator, Generator
 from openai import OpenAI
 from tools.tool_base import Tool
 from providers.api.config import Config
+from providers.utils.stream_smoother import StreamSmoother
+from providers.utils.throbber import Throbber
+import sys
+import threading
+import itertools
+import time
 
 class DeepseekR1APIProvider(Tool):
     name = "deepseek-r1_api"
@@ -34,6 +40,7 @@ class DeepseekR1APIProvider(Tool):
             api_key=Config.DEEPSEEK_API_KEY,
             base_url="https://api.deepseek.com"
         )
+        self.smoother = StreamSmoother()
 
     def run(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -92,8 +99,7 @@ class DeepseekR1APIProvider(Tool):
                 }
             }
 
-    def stream(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Stream responses from the API."""
+    def stream(self, params: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
         try:
             # Same message formatting as run()
             messages = []
@@ -121,63 +127,51 @@ class DeepseekR1APIProvider(Tool):
             if messages[-1]["role"] != "user":
                 messages.pop()
 
-            print("\nSending messages to API:", messages)  # Debug print
-            print("\nAttempting to create completion...")  # Debug print
+            throbber = Throbber()
+            throbber.start()
 
             try:
-                response = self.client.chat.completions.create(
+                stream = self.client.chat.completions.create(
                     model="deepseek-reasoner",
                     messages=messages,
-                    temperature=0.0,  # Use 0.0 for reasoning tasks
+                    temperature=0.0,
                     max_tokens=params.get("max_tokens", 8000),
                     stream=True
                 )
-                print("\nGot response object:", response)  # Debug print
-            except Exception as api_error:
-                print(f"\nAPI call failed: {str(api_error)}")  # Debug print
+                throbber.stop()
+
+                for chunk in stream:
+                    # Ensure chunk and choices exist
+                    if not chunk or not hasattr(chunk, "choices") or not chunk.choices:
+                        continue
+
+                    # Get the delta object
+                    delta_obj = chunk.choices[0].delta
+                    if not delta_obj:
+                        continue
+
+                    # Extract content using attribute checks
+                    content_piece = ""
+                    if hasattr(delta_obj, "content") and delta_obj.content:
+                        content_piece = delta_obj.content
+                    elif hasattr(delta_obj, "reasoning_content") and delta_obj.reasoning_content:
+                        content_piece = delta_obj.reasoning_content
+
+                    if content_piece:
+                        for smooth_chunk in self.smoother.smooth_stream(content_piece):
+                            print(smooth_chunk, end="", flush=True)
+                            yield {
+                                "response": smooth_chunk
+                            }
+
+            except Exception as e:
+                print(f"\nDEBUG: Error: {e}")
+                throbber.stop()
                 raise
 
-            print("\nStarting to process chunks...")  # Debug print
-            
-            for chunk in response:  # Regular for loop, not async
-                print("\nReceived chunk:", chunk)  # Debug print
-                if hasattr(chunk.choices[0], 'delta'):
-                    # Handle both reasoning_content and content
-                    if hasattr(chunk.choices[0].delta, 'reasoning_content'):
-                        content = chunk.choices[0].delta.reasoning_content
-                        if content:
-                            yield {
-                                "type": "tool_result",
-                                "content": {
-                                    "status": "reasoning",
-                                    "message": "Chain of thought",
-                                    "content": content,
-                                    "response": content
-                                }
-                            }
-                    elif hasattr(chunk.choices[0].delta, 'content'):
-                        content = chunk.choices[0].delta.content
-                        if content:
-                            yield {
-                                "type": "tool_result",
-                                "content": {
-                                    "status": "success",
-                                    "message": "Final answer",
-                                    "content": content,
-                                    "response": content
-                                }
-                            }
-                    
         except Exception as e:
-            print(f"\nStream error: {str(e)}")  # Debug print
-            print(f"\nError type: {type(e)}")  # Debug print
-            print(f"\nError details: {dir(e)}")  # Debug print
+            if 'throbber' in locals():
+                throbber.stop()
             yield {
-                "type": "tool_result",
-                "content": {
-                    "status": "error",
-                    "message": f"DeepSeek API error: {str(e)}",
-                    "content": str(e),
-                    "response": str(e)
-                }
+                "response": f"Error: {str(e)}"
             } 

@@ -197,7 +197,6 @@ class AutonomousAgent:
             for chunk in stream_generator:
                 chunk_text = chunk.get("response", "")  # Or however your model yields text
                 try:
-                    # Feed chunk text to RealTimeToolParser
                     user_text = parser.feed(chunk_text)
                     # Accumulate normal user-visible text
                     final_text += user_text

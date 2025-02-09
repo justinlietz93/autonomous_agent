@@ -7,6 +7,7 @@
 import ollama
 from typing import Dict, Any
 from tools.tool_base import Tool
+from providers import Throbber, StreamSmoother
 
 class MODEL_NAMEProvider(Tool):
     name = "ollama_MODEL_NAME"
@@ -30,11 +31,17 @@ class MODEL_NAMEProvider(Tool):
         try:
             prompt = "\n".join(msg["content"] for msg in params["messages"])
             print("\nStarting Ollama stream...")
+
+            throbber = Throbber()
+            throbber.start()
+
             response = ollama.generate(
                 model="MODEL_NAME",
                 prompt=prompt,
                 stream=True
             )
+            throbber.stop()
+
             full_response = ""
             for chunk in response:
                 text_piece = chunk.get("response", "")
@@ -49,6 +56,8 @@ class MODEL_NAMEProvider(Tool):
                 }
             }
         except Exception as e:
+            if 'throbber' in locals():
+                throbber.stop()
             print(f"Ollama error => {str(e)}")
             return {
                 "type": "tool_result",

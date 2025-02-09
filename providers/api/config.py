@@ -19,10 +19,14 @@ class Config:
     
     # API Keys
     DEEPSEEK_API_KEY: str = os.getenv('DEEPSEEK_API_KEY')
+    ANTHROPIC_API_KEY: str = os.getenv('ANTHROPIC_API_KEY')
     
     # Model settings
     DEEPSEEK_MAX_TOKENS: int = 64000  # Context window
     DEEPSEEK_OUTPUT_MAX: int = 8192   # Max output tokens
+    
+    # Claude settings
+    CLAUDE_MODEL: str = os.getenv('CLAUDE_MODEL', 'claude-3-5-sonnet-20241022')
     
     # Temperature recommendations
     TEMPERATURE_SETTINGS = {
@@ -39,6 +43,11 @@ class Config:
         if not cls.DEEPSEEK_API_KEY:
             raise ValueError(
                 "Missing DEEPSEEK_API_KEY environment variable. "
+                "Please add it to your .env file."
+            )
+        if not cls.ANTHROPIC_API_KEY:
+            raise ValueError(
+                "Missing ANTHROPIC_API_KEY environment variable. "
                 "Please add it to your .env file."
             )
 
