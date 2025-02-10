@@ -1,7 +1,8 @@
-from typing import Dict, Type, Optional
+from typing import Dict, Type, Optional, Any
 import importlib
 import os
 from pathlib import Path
+from tools.tool_base import Tool
 
 class ProviderLibrary:
     """A library that manages and provides access to different LLM providers."""
@@ -57,18 +58,14 @@ class ProviderLibrary:
             except Exception as e:
                 print(f"Failed to load provider from {provider_file}: {e}")
                 
-    def get_provider(self, name: str, **kwargs) -> Optional[object]:
-        """
-        Get a provider instance by name.
-        
-        Args:
-            name: Name of the provider (e.g., "deepseek_ollama" or "deepseek_api")
-            **kwargs: Additional arguments to pass to the provider constructor
-        """
-        # First try exact match in flat dictionary
+    def get_provider(self, name: str, tool_manager: Optional[Any] = None, **kwargs) -> Optional[Tool]:
+        """Get a provider instance by name with tool support."""
         provider_class = self.providers.get(name)
         if provider_class:
             try:
+                # Explicitly pass tool_manager if provided
+                if tool_manager:
+                    return provider_class(tool_manager=tool_manager, **kwargs)
                 return provider_class(**kwargs)
             except Exception as e:
                 print(f"Failed to initialize provider {name}: {e}")

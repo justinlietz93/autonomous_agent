@@ -1,3 +1,16 @@
+#########################################################
+
+# ATTENTION: THERE MAY BE ISSUES WITH THIS FILE.
+# TOOL CALL FORMATS ARE NOT ALWAYS CORRECTLY HANDED TO THE tool_parser.py SCRIPT.
+# PLEASE REVIEW THE TOOL SIGNATURES, AND MAKE SURE THIS LOGIC MATCHES THE REQUIREMENTS.
+
+# IF YOU FIND ISSUES DOCUMENT THEM IN docs/tool_pipeline_issues.md
+
+#########################################################   
+
+
+
+
 import re
 import json
 from typing import Any, Dict, List, Union, Optional
@@ -159,34 +172,29 @@ class InlineCallParser:
                         {"field": field, "expected": expected_type.__name__, "got": type(value).__name__}
                     )
 
-    def feed(self, text_chunk: str) -> str:
-        """
-        1) Accumulate chunk into self.buffer
-        2) Scan for inline calls like shell(...), turning them into
-           'TOOL_CALL: { "tool":..., "input_schema": {...}}'
-        3) Let the RealTimeToolParser handle those newly embedded JSON calls
-        4) Return the normal text (non-tool) that remains
-        """
+    def feed(self, text_chunk: str, debug: bool = True) -> str:
         try:
             self.buffer += text_chunk
             output_text = ""
 
+            # while True:
+            #     match = re.search(r'(?:^|\s+)(\w+)\s*\(', self.buffer, re.MULTILINE)
             while True:
-                # Updated pattern to be more precise about tool calls
-                match = re.search(r'(?:^|\s+)(\w+)\s*\(', self.buffer, re.MULTILINE)
+                match = re.search(r'\b(\w+)\s*\(', self.buffer)
+                 
                 if not match:
                     break
 
                 func_name = match.group(1)
+                if debug:
+                    print(f"DEBUG: Found tool call: {func_name}")
+
                 if func_name not in self.TOOL_NAME_MAP:
-                    # Not a valid tool name - skip it
                     output_text += self.buffer[:match.end()]
                     self.buffer = self.buffer[match.end():]
                     continue
 
                 start_index = match.start()
-
-                # We need to find the matching closing parenthesis
                 paren_level = 1
                 i = match.end()
                 while i < len(self.buffer) and paren_level > 0:
@@ -197,52 +205,41 @@ class InlineCallParser:
                     i += 1
 
                 if paren_level != 0:
-                    # Didn't find closing paren - need more text
-                    return ""
+                    # Incomplete call - keep buffer and break
+                    break
 
-                # We have the entire substring: funcName(...) from start_index to i
+                # Extract ONLY the arguments between the parentheses
                 inline_call_str = self.buffer[start_index:i]
-                # The arguments are inside the parentheses
-                arg_str = inline_call_str[len(func_name)+1 : -1]  # remove "foo(" and the final ")"
+                arg_start = inline_call_str.find('(') + 1
+                arg_str = inline_call_str[arg_start:-1]
 
-                # Build a function to parse those arguments
                 parsed_args = self._parse_args(arg_str)
-
-                # Map the function name to the actual tool, build input_schema
                 tool_call_json = self._format_tool_call(func_name, parsed_args)
-
-                # Turn it into a 'TOOL_CALL: {...}' string
-                # We'll replace the entire inline call with that
-                new_tool_call_str = self.marker + json.dumps(tool_call_json, ensure_ascii=False)
-
-                # Everything up to the start of the match is normal text
-                output_text += self.buffer[:start_index]
-
-                # Insert the 'TOOL_CALL: ...'
-                output_text += new_tool_call_str
-
-                # Remove that portion from self.buffer
-                self.buffer = self.buffer[i:]
-
-            # After processing all tool calls, combine remaining text
-            combined_text = output_text + self.buffer
-            
-            # Clear buffer only after successful processing
-            self.buffer = ""
-            
-            # Process through RealTimeToolParser
-            try:
-                result_text = self.rtp.feed(combined_text)
-                return result_text
-            except ToolCallError as e:
-                # Return both the error and the original text
-                return f"{combined_text}\n[TOOL ERROR: {str(e)}]\n"
                 
+                if debug:
+                    print(f"DEBUG: Formatted JSON: {tool_call_json}")
+
+                # Send to parser and get result immediately
+                tool_call_str = self.marker + json.dumps(tool_call_json)
+                result = self.rtp.feed(tool_call_str)
+
+                # Replace the inline call text with the tool result, so it actually
+                # shows up in final output rather than leaving the original inline call.
+                parsed_part = self.buffer[:start_index]
+                remaining_part = self.buffer[i:]
+                output_text += parsed_part + result
+                self.buffer = remaining_part
+
+            # Handle any remaining text
+            if self.buffer:
+                output_text += self.buffer
+                self.buffer = ""
+
+            return output_text
+
         except ValidationError as e:
-            # Return both the error and any accumulated text
             return f"{self.buffer}\n[VALIDATION ERROR: {str(e)}]\n"
         except Exception as e:
-            # Return both the error and any accumulated text
             return f"{self.buffer}\n[ERROR: {str(e)}]\n"
 
     def _parse_args(self, args_str: str) -> Dict[str, Any]:
@@ -298,14 +295,18 @@ class InlineCallParser:
 
         try:
             if mapped_tool == "file":
-                # Map file operations to correct format
                 operation = "read"  # default
+
+                # If first pos arg is a known file operation like "list_dir",
+                # then take that as the operation, and shift the args.
+                if len(pos_args) > 0 and pos_args[0] in ["read", "write", "delete", "list_dir", "append"]:
+                    operation = pos_args[0]
+                    pos_args = pos_args[1:]
+
                 if "write" in func_name:
                     operation = "write"
                 elif "delete" in func_name:
                     operation = "delete"
-                elif "list_dir" in func_name:
-                    operation = "list_dir"
 
                 input_schema = {
                     "operation": operation,
@@ -337,10 +338,20 @@ class InlineCallParser:
                 }
 
             elif mapped_tool == "web_browser":
-                # Format web browser requests
+                extract_links_val = args.get("extract_links", False)
+                # Convert string "False" => False, "True" => True
+                if isinstance(extract_links_val, str):
+                    extract_links_val = (extract_links_val.lower() == "true")
+
                 input_schema = {
                     "url": pos_args[0] if pos_args else "",
-                    "extract_type": "links" if args.get("extract_links", False) else "text"
+                    "extract_type": "links" if extract_links_val else "text"
+                }
+
+            elif mapped_tool == "documentation_check":
+                # Format documentation check
+                input_schema = {
+                    "path": pos_args[0] if pos_args else ""
                 }
 
             elif mapped_tool == "http_request":

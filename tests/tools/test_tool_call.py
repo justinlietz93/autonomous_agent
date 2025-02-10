@@ -270,6 +270,8 @@ class RealTimeToolParser:
             "code_runner": "code_runner",
             "shell": "shell",
             "documentation_check": "documentation_check",
+            "file": "file",
+            "computer": "computer",
             "file_read": "file",
             "file_write": "file",
             "file_delete": "file",

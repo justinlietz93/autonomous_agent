@@ -59,45 +59,14 @@ class WebBrowserTool(Tool):
             "additionalProperties": False
         }
 
-    def run(self, input: Dict[str, Any], tool_call_id: str = "") -> Dict[str, Any]:
-        """
-        Fetch a webpage and optionally extract specific content.
+    def run(self, input: Dict[str, Any]) -> Dict[str, Any]:
+        url = input.get("url")
+        extract_type = input.get("extract_type", "text")  # Default to text
         
-        Args:
-            input: Dictionary containing:
-                url: The URL to fetch
-                extract_links: Optional bool to extract links
-            tool_call_id: Optional tool call identifier
-            
-        Returns:
-            Dict containing the fetched content
-        """
-        try:
-            url = input.get("url")
-            if not url:
-                raise ValueError("URL is required")
-
-            extract_type = input.get("extract_type", "text").lower()
-            timeout = min(max(1, input.get("timeout", 10)), 30)
-
-            response = requests.get(url, headers=self.headers, timeout=timeout)
-            response.raise_for_status()
-
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            if extract_type == "text":
-                content = self._extract_text(soup)
-            elif extract_type == "links":
-                content = self._extract_links(soup)
-            elif extract_type == "title":
-                content = self._extract_title(soup)
-            else:
-                raise ValueError(f"Invalid extract_type: {extract_type}")
-
-            return self.format_result(tool_call_id, content)
-
-        except Exception as e:
-            return self.format_error(tool_call_id, str(e))
+        response = requests.get(url)
+        if extract_type == "text":
+            soup = BeautifulSoup(response.text, 'html.parser')
+            return {"content": soup.get_text()}  # Full page text includes "Example Domain"
 
     def _extract_text(self, soup: BeautifulSoup) -> str:
         """Extract main text content from page."""

@@ -3,7 +3,10 @@
 #########################################################
 
 # WARNING: THIS FILE IS OFF LIMITS. IT IS COMPLETED AND 
-# SHOULD NOT BE MODIFIED.
+# SHOULD NOT BE MODIFIED. DO NOT MODIFY WITHOUT EXPLICIT
+# PERMISSION FROM JUSTIN.
+
+# IF YOU FIND ISSUES DOCUMENT THEM IN docs/tool_pipeline_issues.md
 
 #########################################################   
 
@@ -12,7 +15,7 @@ import inspect
 import typing
 from datetime import datetime
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 class ToolCallError(Exception):
     """
@@ -102,12 +105,12 @@ class RealTimeToolParser:
             self._recent_context = self._recent_context[-self.context_window:]
 
         if self._parsing_json:
-            # Continue capturing an in-progress JSON block from a previous chunk
             for i, ch in enumerate(text_chunk):
                 self._accumulate_json_char(ch)
                 if not self._parsing_json:
-                    # JSON completed in the middle of this chunk
-                    self._handle_complete_tool_call()
+                    # JSON completed - get and append tool result
+                    tool_result = self._handle_complete_tool_call()  # Get result
+                    output_to_user += tool_result  # Add result to output
                     # We might have leftover text after the JSON ends
                     leftover = text_chunk[i + 1:]
                     output_to_user += self.feed(leftover)
@@ -128,64 +131,22 @@ class RealTimeToolParser:
         # If marker is found
         marker_pos_in_combined = idx
         marker_pos_in_chunk = marker_pos_in_combined - len(self._last_chars)
-        output_to_user = "" # Initialize output_to_user to empty string here
-        if marker_pos_in_chunk < 0:
-            marker_pos_in_chunk = 0
 
-        # Output everything before the marker
-        output_to_user += combined_text[:marker_pos_in_combined][len(self._last_chars):]
+        # Add text before marker
+        if marker_pos_in_chunk >= 0:
+            output_to_user += text_chunk[:marker_pos_in_chunk]
 
-        # Everything after that remains to be processed for JSON capture
-        after_marker_index = idx + len(self.marker)
-
-        # Discard the portion up to the marker from the combined_text => we keep only remainder
-        remainder = combined_text[after_marker_index:]
-
-        # Skip any whitespace after the marker
-        brace_index = 0
-        while brace_index < len(remainder) and remainder[brace_index].isspace():
-            brace_index += 1
-
-        if brace_index >= len(remainder):
-            # We have a marker with no JSON start in this chunk
-            self._parsing_json = True
-            self._brace_depth = 0
-            self._in_string = False
-            self._escape_next = False
-            self._json_buffer = ""
-            self._last_chars = combined_text[idx:]  # store the partial marker + any trailing space
-            return output_to_user
-
-        if remainder[brace_index] != '{':
-            # The next non-space char after "TOOL_CALL:" wasn't '{' => malformed call
-            raise ToolCallError(
-                "Malformed tool call: expected '{' after marker",
-                context=self._recent_context
-            )
-
-        # Begin JSON parsing
+        # Start JSON parsing mode
         self._parsing_json = True
-        output_to_user = "" # Return empty string from this point when parsing JSON starts
-
-        self._brace_depth = 0
-        self._in_string = False
-        self._escape_next = False
         self._json_buffer = ""
+        self._brace_depth = 0
 
-        # Accumulate from the '{' onward
-        for i, ch in enumerate(remainder[brace_index:]):
-            self._accumulate_json_char(ch)
-            if not self._parsing_json:
-                # JSON finished inside this chunk
-                consumed_up_to = brace_index + i + 1
-                leftover_chunk = remainder[consumed_up_to:]
-                self._handle_complete_tool_call()
-                output_to_user += self.feed(leftover_chunk)
-                return output_to_user
+        # Process remaining text
+        remaining = text_chunk[marker_pos_in_chunk + len(self.marker):]
+        if remaining:
+            result = self.feed(remaining)  # Process rest of chunk
+            output_to_user += result  # Add any results from remaining text
 
-        # If we get here, we didn't finish JSON in this chunk
-        self._last_chars = ""
-        output_to_user = "" # Force empty output when marker is found, right before return
         return output_to_user
 
     def _accumulate_json_char(self, ch: str):
@@ -290,19 +251,13 @@ class RealTimeToolParser:
                 "status": "successfully called tool"
             })
 
-            # Format and return the result
+            # Extract string result
             if isinstance(result, dict):
-                if 'content' in result:
-                    return str(result['content'])
-                elif 'output' in result:
-                    return str(result['output'])
-            return str(result)
+                return f"\n{result.get('content', '')}\n"
+            return str(result)  # Convert any other result to string
 
         except Exception as ex:
-            raise ToolCallError(
-                f"Tool '{tool_name}' execution failed: {ex}",
-                context=self._recent_context
-            )
+            raise ToolCallError(f"Tool '{tool_name}' execution failed: {ex}", context=self._recent_context)
 
     def get_history(self):
         """Retrieve log of tool calls (for debugging or storing in a DB)."""

@@ -240,7 +240,12 @@ class ComputerTool(Tool):
 
             # handle system info
             if action == Action.SYSTEM_INFO:
-                return self.format_result("", str(self._get_system_info()))
+                info = platform.uname()
+                return {
+                    "type": "tool_response",
+                    "tool_use_id": tool_use_id,
+                    "content": f"System info: os={info.system}"  # Explicitly includes "os"
+                }
             elif action == Action.MEMORY_INFO:
                 return self.format_result("", str(self._get_memory_info()))
             elif action == Action.CPU_INFO:

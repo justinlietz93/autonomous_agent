@@ -86,7 +86,7 @@ class FileTool(Tool):
         """Execute the requested file operation."""
         operation = input.get("operation", "")
         path = input.get("path", "")
-        content = input.get("content")
+        content = input.get("content", "")
         
         if not operation or not path:
             return {
@@ -211,26 +211,17 @@ class FileTool(Tool):
 
             elif operation == "list_dir":
                 if not os.path.exists(path):
-                    return self._error(f"Directory not found: {path}")
-                if not os.path.isdir(path):
-                    return self._error(f"Path is not a directory: {path}")
-                
-                recursive = input.get("recursive", False)
-                result = []
-                
-                def list_items(dir_path, prefix=""):
-                    for item in os.listdir(dir_path):
-                        item_path = os.path.join(dir_path, item)
-                        rel_path = os.path.relpath(item_path, path)
-                        if os.path.isdir(item_path):
-                            result.append(f"DIR  {prefix}{rel_path}")
-                            if recursive:
-                                list_items(item_path, prefix)
-                        else:
-                            result.append(f"FILE {prefix}{rel_path}")
-                            
-                list_items(path)
-                return self._success("\n".join(result))
+                    return {
+                        "type": "tool_response",
+                        "tool_use_id": "",
+                        "content": f"Directory not found: {path}"
+                    }
+                files = os.listdir(path)
+                return {
+                    "type": "tool_response", 
+                    "tool_use_id": "",
+                    "content": "\n".join(files)
+                }
                 
             else:
                 return self._error(f"Unknown operation: {operation}")

@@ -9,17 +9,11 @@ import argparse
 import sys
 from datetime import datetime
 from typing import Dict, Any
-import string  # for random session ID
-
-# Import the chunk-lag modules
+import string
 from providers.utils.safe_chunker import SafeChunker
 from providers.utils.stream_smoother import StreamSmoother
-
-# If you want to parse in-line calls, import your parser
 from tools.parse_formatter import InlineCallParser
 from tools.tool_parser import ToolCallError, RealTimeToolParser
-
-# The rest are from your codebase
 from memory.context_manager import ContextStorage
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
@@ -52,20 +46,22 @@ class AutonomousAgent:
         # 1) Initialize context storage
         self.context_storage = ContextStorage(storage_dir="memory/context_logs")
 
-        # 2) Load the chosen LLM provider from ProviderLibrary
+        # 2) Create tool manager first
+        self.tool_manager = ToolManager(register_defaults=True)
+
+        # 3) Load the chosen LLM provider from ProviderLibrary with tool_manager
         provider_lib = ProviderLibrary()
-        self.llm = provider_lib.get_provider(provider_name)
+        self.llm = provider_lib.get_provider(provider_name, tool_manager=self.tool_manager)
         if not self.llm:
             available = provider_lib.list_providers()
             raise ValueError(f"Provider '{provider_name}' not found. Available providers: {available}")
         print(f"Loaded provider: {provider_name}")
 
-        # 3) Initialize a PromptManager
+        # 4) Initialize a PromptManager
         self.prompt_manager = PromptManager(model_name=provider_name)
 
-        # 4) Create a tool manager (for in-line calls or normal usage)
-        self.tool_manager = ToolManager(register_defaults=True, llm_provider=self.llm)
-        # print("\nRegistered tools:", list(self.tool_manager.tools.keys()))
+        # Register the provider with the tool manager
+        self.tool_manager.llm_provider = self.llm
         if not self.tool_manager.tools:
             print("WARNING: No tools were registered!")
 

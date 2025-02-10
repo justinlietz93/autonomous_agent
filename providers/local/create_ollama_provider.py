@@ -17,11 +17,22 @@ def sanitize_class_name(model_name: str) -> str:
     class_name = ''.join(x.capitalize() for x in class_name.split('_'))
     return f"{class_name}Provider"
 
+def sanitize_model_name(model_name: str) -> str:
+    """Convert model name to format suitable for provider name."""
+    # Replace dots and special chars with hyphens
+    safe_name = re.sub(r'[^a-zA-Z0-9-]', '-', model_name)
+    # Remove consecutive hyphens
+    safe_name = re.sub(r'-+', '-', safe_name)
+    # Remove leading/trailing hyphens
+    safe_name = safe_name.strip('-')
+    return safe_name
+
 def create_provider(model_name: str) -> None:
     """Create a new Ollama provider file from template."""
     
-    # Convert model name to proper format for filename
-    safe_model_name = model_name.replace('.', '-')
+    # Convert model name to proper formats
+    safe_model_name = sanitize_model_name(model_name)
+    class_name = sanitize_class_name(model_name)
     
     # Create provider file path 
     provider_dir = Path(__file__).parent
@@ -43,9 +54,6 @@ def create_provider(model_name: str) -> None:
         with open(template_file, 'r') as f:
             template_content = f.read()
             
-        # Create valid Python class name
-        class_name = sanitize_class_name(model_name)
-            
         # Replace template placeholders
         provider_content = (template_content
             .replace('MODEL_NAMEProvider', class_name)
@@ -56,7 +64,12 @@ def create_provider(model_name: str) -> None:
             f.write(provider_content)
             
         print(f"Created new Ollama provider at {provider_file}")
-        print(f"Using class name: {class_name}")
+        print(f"Provider class: {class_name}")
+        print(f"Provider name: {safe_model_name}_ollama")
+        print("\nTo use this provider:")
+        print(f"1. Install model: ollama pull {model_name}")
+        print("2. Start Ollama: ollama serve")
+        print(f"3. Run with: python main_autonomous.py --provider {safe_model_name}_ollama")
         
     except Exception as e:
         print(f"Error creating provider: {str(e)}")
