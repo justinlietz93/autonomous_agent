@@ -18,6 +18,7 @@ from memory.context_manager import ContextStorage
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
 from prompts.prompt_manager import PromptManager
+from prompts.goals.goal_manager import GoalManager
 
 
 def parse_args():
@@ -38,18 +39,20 @@ def parse_args():
     parser.add_argument('--single', '-s',
                        action='store_true',
                        help='Run in single response mode instead of autonomous loop')
+    parser.add_argument('--goal', type=str,
+                       help="Name of the goal sequence to run (e.g. memory_development)")
     return parser.parse_args()
 
 
 class AutonomousAgent:
-    def __init__(self, provider_name: str = 'claude-3-5-sonnet-20241022_api', single_mode: bool = False):
+    def __init__(self, provider_name: str = 'claude-3-5-sonnet-20241022_api', single_mode: bool = False, goal_name: str = None):
         # 1) Initialize context storage
         self.context_storage = ContextStorage(storage_dir="memory/context_logs")
 
         # 2) Create tool manager first
         self.tool_manager = ToolManager(register_defaults=True)
 
-        # 3) Load the chosen LLM provider from ProviderLibrary with tool_manager
+        # 3) Load the chosen LLM provider
         provider_lib = ProviderLibrary()
         self.llm = provider_lib.get_provider(provider_name, tool_manager=self.tool_manager)
         if not self.llm:
@@ -59,6 +62,17 @@ class AutonomousAgent:
 
         # 4) Initialize a PromptManager
         self.prompt_manager = PromptManager(model_name=provider_name)
+
+        # 5) Create goal manager and load goal if specified
+        ### THIS MIGHT BREAK SOMETHING, VERIFY ###
+        self.goal_manager = GoalManager(self.prompt_manager)
+        if goal_name:
+            self.goal_manager.load_goal(goal_name)
+            # Now update prompt_manager with the goal's first prompt
+            first_prompt = self.goal_manager.get_current_prompt()
+            if first_prompt:
+                self.prompt_manager.set_active_prompt(first_prompt)
+        ### THIS MIGHT BREAK SOMETHING, VERIFY ###
 
         # Register the provider with the tool manager
         self.tool_manager.llm_provider = self.llm
@@ -77,8 +91,6 @@ class AutonomousAgent:
         self.log_file = os.path.join("memory", "context_logs", f"context_{timestamp_str}_{self.session_id}.txt")
 
         # print("Registered tools:", list(self.tool_manager.tools.keys()))
-
-        # Done
 
     def run(self):
         """
@@ -205,6 +217,21 @@ from scratch.
             time.sleep(3)
             last_response = final_text
 
+            ### THIS MIGHT BREAK SOMETHING, VERIFY ###
+            # Check goal progress
+            if self.goal_manager.current_goal:
+                goal_complete = self.goal_manager.update_progress(final_text)
+                if goal_complete:
+                    print("Goal sequence complete!")
+                    self.running = False
+                else:
+                    # Update prompt for next iteration
+                    next_prompt = self.goal_manager.get_current_prompt()
+                    if next_prompt:
+                        self.prompt_manager.set_active_prompt(next_prompt)
+
+            ### THIS MIGHT BREAK SOMETHING, VERIFY ###
+
     def log(self, message: str):
         
         try:
@@ -263,9 +290,16 @@ if __name__ == "__main__":
 
     # 4) Launch agent
     try:
-        agent = AutonomousAgent(provider_name=args.provider, single_mode=args.single)
-        if args.prompt:
+        agent = AutonomousAgent(
+            provider_name=args.provider, 
+            single_mode=args.single,
+            goal_name=args.goal  # Pass goal name to agent
+        )
+        
+        # Only set prompt if no goal is specified
+        if args.prompt and not args.goal:
             agent.prompt_manager.set_active_prompt(args.prompt)
+        
         agent.run()
     except ValueError as e:
         print(f"Error: {e}")

@@ -1,0 +1,41 @@
+{
+    "// INSTRUCTIONS": [
+        "This sequence maps the codebase structure and documents it",
+        "Each prompt runs for a specific number of iterations",
+        "The sequence will:",
+        "1. Map directories and files",
+        "2. Create markdown documentation of the structure",
+        "3. Document codebase functionality",
+        "4. Research and document RCoT architecture",
+        "",
+        "Run with: python main_autonomous.py --goal demo_mapping"
+    ],
+    "name": "demo_mapping",
+    "description": "Map and document codebase structure",
+    "prompt_sequence": [
+        {
+            "prompt": "NAVIGATION",
+            "iterations": 2,
+            "description": "List and explore directory structure",
+            "goal": "Use list_dir() to map out the entire codebase structure"
+        },
+        {
+            "prompt": "DOCUMENTATION",
+            "iterations": 1,
+            "description": "Create markdown documentation",
+            "goal": "Create codebase_map.md in the project root using the directory structure found"
+        },
+        {
+            "prompt": "ANALYSIS",
+            "iterations": 1,
+            "description": "Document codebase functionality",
+            "goal": "Add codebase functionality description to codebase_map.md in the project root"
+        },
+        {
+            "prompt": "RESEARCH",
+            "iterations": 1,
+            "description": "Research RCoT architecture",
+            "goal": "Add RCoT architecture overview from github.com/justinlietz93/RCoT to codebase_map.md in the project root"
+        }
+    ]
+} 

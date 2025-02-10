@@ -11,18 +11,29 @@ class PromptManager:
     SYSTEM_PROMPTS = {"BASE_RULES", "TOOL_MENU"}  # Prompts that shouldn't be listed
     BENCHMARK_PROMPTS = {"*_BENCHMARK"}  # Add your benchmark prompts here
     
-    def __init__(self, default_prompt: str = None, model_name: str = "AI Assistant"):
+    def __init__(self, default_prompt: str = None, model_name: str = "AI Assistant", goal_prompt: str = None):
         """Initialize the prompt manager.
         
         Args:
             default_prompt: Name of prompt to use as default. If None, uses class DEFAULT_PROMPT.
             model_name: Name of the current model being used
+            goal_prompt: Name of prompt from goal sequence. Takes precedence over default_prompt.
         """
         self.prompts: Dict[str, str] = {}
         self.model_name = model_name
         self._load_prompts()
         
-        # Only set default if no prompt specified
+        ### THIS MIGHT BREAK SOMETHING, VERIFY ###
+        # First try goal_prompt if provided
+        if goal_prompt is not None:
+            try:
+                self.set_active_prompt(goal_prompt)
+                return
+            except ValueError:
+                print(f"Warning: Goal - '{goal_prompt}' not found, falling back to default")
+        ### THIS MIGHT BREAK SOMETHING, VERIFY ###
+        
+        # Then try default_prompt or class default
         if default_prompt is None:
             try:
                 self.set_active_prompt(self.DEFAULT_PROMPT)

@@ -1,0 +1,35 @@
+{
+    "// INSTRUCTIONS": [
+        "This file defines a sequence of prompts to develop the memory system",
+        "Each prompt in the sequence can advance based on either:",
+        "1. iterations: Fixed number of runs before moving to next prompt",
+        "2. condition: Text to look for in session logs before advancing",
+        "",
+        "Available prompts can be found in prompts/system_prompts/",
+        "Run with: python main_autonomous.py --goal memory_development",
+        "",
+        "The sequence will:",
+        "1. Run DEMO prompt for 2 iterations to test functionality",
+        "2. Run BUILD_MEMORY until memory system is validated",
+        "3. Run SELF_OPTIMIZATION until improvements are shown"
+    ],
+    "name": "memory_development",
+    "description": "Develop and validate memory system",
+    "prompt_sequence": [
+        {
+            "prompt": "DEMO",
+            "iterations": 2,
+            "description": "Test basic functionality"
+        },
+        {
+            "prompt": "BUILD_MEMORY",
+            "condition": "memory system validated",
+            "description": "Build memory system"
+        },
+        {
+            "prompt": "SELF_OPTIMIZATION",
+            "condition": "improvements demonstrated",
+            "description": "Optimize the system"
+        }
+    ]
+} 
