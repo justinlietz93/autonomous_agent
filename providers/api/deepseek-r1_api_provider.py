@@ -1,13 +1,11 @@
-from typing import Dict, Any, Optional, AsyncGenerator, Generator
+from typing import Dict, Any, Generator
 from openai import OpenAI
 from tools.tool_base import Tool
 from providers.api.config import Config
+from providers.utils.safe_chunker import SafeChunker
 from providers.utils.stream_smoother import StreamSmoother
-from providers.utils.throbber import Throbber
-import sys
-import threading
-import itertools
-import time
+from tools.parse_formatter import InlineCallParser
+from tools.tool_manager import ToolManager
 
 class DeepseekR1APIProvider(Tool):
     name = "deepseek-r1_api"
@@ -20,11 +18,6 @@ class DeepseekR1APIProvider(Tool):
                 "items": {"type": "object"},
                 "description": "Chat message history"
             },
-            "temperature": {
-                "type": "number",
-                "description": "Sampling temperature",
-                "default": 0.6
-            },
             "max_tokens": {
                 "type": "integer",
                 "description": "Maximum tokens to generate",
@@ -34,44 +27,28 @@ class DeepseekR1APIProvider(Tool):
         "required": ["messages"]
     }
 
-    def __init__(self):
+    def __init__(self, tool_manager: ToolManager = None):
         super().__init__()
         self.client = OpenAI(
             api_key=Config.DEEPSEEK_API_KEY,
             base_url="https://api.deepseek.com"
         )
+
+        # Setup chunker + typed-lag smoother
+        self.chunker = SafeChunker(flush_interval=1.5)
         self.smoother = StreamSmoother()
 
+        # If you have a tool_manager, build the parser
+        self.tool_manager = tool_manager
+        if self.tool_manager:
+            self.parser = InlineCallParser(self.tool_manager.tools, marker="TOOL_CALL:")
+        else:
+            self.parser = None
+
     def run(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Non-streaming approach, optional."""
         try:
-            # Ensure messages have role field and alternate properly
-            messages = []
-            last_role = None
-            
-            for msg in params["messages"]:
-                if not isinstance(msg, dict):
-                    msg = {"role": "user", "content": str(msg)}
-                elif "role" not in msg:
-                    msg = {"role": "user", "content": msg.get("content", str(msg))}
-                
-                # Skip if same role would be repeated
-                if last_role == msg["role"]:
-                    continue
-                    
-                messages.append(msg)
-                last_role = msg["role"]
-
-            # Ensure we start with system and end with user
-            if not messages:
-                messages = [{"role": "user", "content": "Hello"}]
-            elif messages[0]["role"] != "system":
-                messages.insert(0, {
-                    "role": "system",
-                    "content": "You are an autonomous agent that can use tools to achieve goals."
-                })
-            if messages[-1]["role"] != "user":
-                messages.pop()  # Remove last non-user message
-
+            messages = self._normalize_messages(params["messages"])
             response = self.client.chat.completions.create(
                 model="deepseek-reasoner",
                 messages=messages,
@@ -79,13 +56,14 @@ class DeepseekR1APIProvider(Tool):
                 max_tokens=params.get("max_tokens", 8000),
                 stream=False
             )
+            content_str = response.choices[0].message.content if response.choices else ""
             return {
                 "type": "tool_result",
                 "content": {
                     "status": "success",
                     "message": "Response generated",
-                    "content": response.choices[0].message.content,
-                    "response": response.choices[0].message.content
+                    "content": content_str,
+                    "response": content_str
                 }
             }
         except Exception as e:
@@ -100,78 +78,93 @@ class DeepseekR1APIProvider(Tool):
             }
 
     def stream(self, params: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+        """Streaming approach with chunker, parser, typed-lag."""
         try:
-            # Same message formatting as run()
-            messages = []
-            last_role = None
-            
-            for msg in params["messages"]:
-                if not isinstance(msg, dict):
-                    msg = {"role": "user", "content": str(msg)}
-                elif "role" not in msg:
-                    msg = {"role": "user", "content": msg.get("content", str(msg))}
-                
-                if last_role == msg["role"]:
+            messages = self._normalize_messages(params["messages"])
+            max_tokens = params.get("max_tokens", 8000)
+
+            stream = self.client.chat.completions.create(
+                model="deepseek-reasoner",
+                messages=messages,
+                temperature=params.get("temperature", 0.6),
+                max_tokens=max_tokens,
+                stream=True
+            )
+
+            for chunk in stream:
+                if not chunk or not hasattr(chunk, "choices") or not chunk.choices:
                     continue
-                    
-                messages.append(msg)
-                last_role = msg["role"]
 
-            if not messages:
-                messages = [{"role": "user", "content": "Hello"}]
-            elif messages[0]["role"] != "system":
-                messages.insert(0, {
-                    "role": "system",
-                    "content": "You are an autonomous agent that can use tools to achieve goals."
-                })
-            if messages[-1]["role"] != "user":
-                messages.pop()
+                delta_obj = chunk.choices[0].delta
+                if not delta_obj:
+                    continue
 
-            throbber = Throbber()
-            throbber.start()
+                # Extract content using attribute checks
+                content_piece = ""
+                if hasattr(delta_obj, "content") and delta_obj.content:
+                    content_piece = delta_obj.content
+                elif hasattr(delta_obj, "reasoning_content") and delta_obj.reasoning_content:
+                    content_piece = delta_obj.reasoning_content
 
-            try:
-                stream = self.client.chat.completions.create(
-                    model="deepseek-reasoner",
-                    messages=messages,
-                    temperature=0.0,
-                    max_tokens=params.get("max_tokens", 8000),
-                    stream=True
-                )
-                throbber.stop()
+                if content_piece:
+                    # Pass partial text into the chunker
+                    for safe_chunk in self.chunker.process_incoming_text(content_piece):
+                        # Optionally parse
+                        parsed_chunk = safe_chunk
+                        if self.parser:
+                            parsed_chunk = self.parser.feed(safe_chunk)
 
-                for chunk in stream:
-                    # Ensure chunk and choices exist
-                    if not chunk or not hasattr(chunk, "choices") or not chunk.choices:
-                        continue
+                        # typed-lag
+                        for typed_char in self.smoother.smooth_stream(parsed_chunk):
+                            yield {"response": typed_char}
 
-                    # Get the delta object
-                    delta_obj = chunk.choices[0].delta
-                    if not delta_obj:
-                        continue
+            # After the stream ends, flush leftover
+            leftover = self.chunker.flush_remaining()
+            if leftover:
+                leftover_parsed = leftover
+                if self.parser:
+                    leftover_parsed = self.parser.feed(leftover)
 
-                    # Extract content using attribute checks
-                    content_piece = ""
-                    if hasattr(delta_obj, "content") and delta_obj.content:
-                        content_piece = delta_obj.content
-                    elif hasattr(delta_obj, "reasoning_content") and delta_obj.reasoning_content:
-                        content_piece = delta_obj.reasoning_content
-
-                    if content_piece:
-                        for smooth_chunk in self.smoother.smooth_stream(content_piece):
-                            print(smooth_chunk, end="", flush=True)
-                            yield {
-                                "response": smooth_chunk
-                            }
-
-            except Exception as e:
-                print(f"\nDEBUG: Error: {e}")
-                throbber.stop()
-                raise
+                for typed_char in self.smoother.smooth_stream(leftover_parsed):
+                    yield {"response": typed_char}
 
         except Exception as e:
-            if 'throbber' in locals():
-                throbber.stop()
-            yield {
-                "response": f"Error: {str(e)}"
-            } 
+            print(f"[DEBUG] Exception in .stream => {e}")
+            yield {"response": f"Error: {str(e)}"}
+
+    def _normalize_messages(self, raw_messages):
+        """Standard message normalizing with strict user/assistant alternation."""
+        messages = []
+        last_role = None
+        
+        # Start with system message if not present
+        if not raw_messages or raw_messages[0].get("role") != "system":
+            messages.append({
+                "role": "system",
+                "content": "You are an autonomous agent that can use tools to achieve goals."
+            })
+        
+        for msg in raw_messages:
+            if not isinstance(msg, dict):
+                msg = {"role": "user", "content": str(msg)}
+            else:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                msg = {"role": role, "content": content}
+            
+            # Skip if same role would be repeated
+            if last_role == msg["role"]:
+                continue
+            
+            messages.append(msg)
+            last_role = msg["role"]
+        
+        # Ensure we end with a user message
+        if messages and messages[-1]["role"] != "user":
+            messages.pop()
+        
+        # Ensure we have at least one message
+        if not messages:
+            messages.append({"role": "user", "content": "Hello"})
+        
+        return messages 

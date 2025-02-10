@@ -28,7 +28,7 @@ setup(
         "mypy>=1.5.0",
     ],
     python_requires=">=3.8",
-    author="Justin",
+    author="Justin Lietz",
     description="A toolkit for LLM interactions",
     classifiers=[
         "Programming Language :: Python :: 3",

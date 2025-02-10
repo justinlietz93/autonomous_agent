@@ -1,6 +1,49 @@
-# LLM_kit
+# Prometheus AI
 
-A toolkit for working with local LLM providers through Ollama.
+A toolkit for LLM interactions with autonomous capabilities.
+
+## Quick Start
+
+1. Clone the repository:
+```bash
+git clone <repository_url>
+cd llm_kit
+```
+
+2. Run the setup script:
+```bash
+chmod +x setup_docker.sh
+./setup_docker.sh
+```
+
+3. Edit the `.env` file with your API keys:
+```
+OPENAI_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
+OLLAMA_HOST=http://localhost:11434
+```
+
+4. Start Ollama server if using local models:
+```bash
+ollama serve
+```
+
+5. Run the system:
+```bash
+docker run --env-file .env -it llm_kit
+```
+
+## Development
+
+- Source code is mounted at `/app` in the container
+- Logs are stored in `memory/context_logs`
+- Use `docker exec -it <container_id> bash` to access the running container
+
+## Requirements
+
+- Docker
+- Ollama (for local models)
+- API keys for OpenAI/Anthropic (if using those providers)
 
 ## Command Line Usage
 
@@ -109,20 +152,6 @@ Options:
 - `--with-context` or `-c`: Include actual context as seen by the LLM
 - `--lines N`: Number of context lines to include (default: 300)
 - `--list` or `-l`: List available prompts
-
-## Requirements
-
-- Python 3.8+
-- Ollama installed and running
-- Required models pulled in Ollama:
-  - `deepseek-r1:32b`
-  - `deepseek-r1:14b`
-  - `phi4:latest`
-
-> **Note**: Make sure Ollama is running before starting the script:
-> ```bash
-> ollama serve
-> ```
 
 ## Development Setup
 
