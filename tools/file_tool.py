@@ -1,19 +1,9 @@
-# selfprompter/tools/file_tool.py
-
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Literal, get_args
 from .tool_base import Tool
 import os
 import shutil
-
-Command = Literal[
-    "view",
-    "create", 
-    "str_replace",
-    "insert",
-    "undo_edit",
-]
 
 SNIPPET_LINES: int = 4
 
@@ -35,13 +25,15 @@ class FileTool(Tool):
             "A powerful file system tool that supports reading, writing, and editing files.\n"
             "Operations:\n"
             "- write: Create or overwrite a file (requires path and content)\n"
-            "- read: Read entire file content (requires path)\n" 
+            "- read: Read entire file content (requires path; if a directory, list its contents)\n" 
             "- read_lines: Read specific lines (requires path, start_line, end_line)\n"
             "- edit_lines: Edit specific lines (requires path, start_line, end_line, content)\n"
             "- delete: Delete a file or directory (requires path)\n"
             "- mkdir: Create a directory (requires path)\n"
             "- copy: Copy a file or directory (requires path and dest)\n"
             "- move: Move a file or directory (requires path and dest)\n"
+            "- append: Append content to a file (requires path and content)\n"
+            "- list_dir: List directory contents (requires path)\n"
         )
 
     @property 
@@ -82,12 +74,17 @@ class FileTool(Tool):
             "required": ["operation", "path"]
         }
 
+    def _resolve_path(self, path: str) -> str:
+        """Resolve a given path to an absolute path using the current working directory if needed."""
+        p = Path(path)
+        return str(p) if p.is_absolute() else str(Path.cwd() / p)
+
     def run(self, input: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the requested file operation."""
         operation = input.get("operation", "")
         path = input.get("path", "")
         content = input.get("content", "")
-        
+
         if not operation or not path:
             return {
                 "type": "tool_response",
@@ -95,23 +92,18 @@ class FileTool(Tool):
                 "content": "Error: operation and path are required"
             }
 
-        # Convert relative path to absolute
-        path = str(Path(path).absolute())
+        # Resolve relative paths
+        path = self._resolve_path(path)
         
         try:
             if operation == "write":
-
                 if not content:
                     return self._error("content is required for write operation")
-                # Convert the provided path to an absolute path
-                abs_path = str(Path(path).absolute())
+                abs_path = self._resolve_path(path)
                 try:
-                    # Ensure the directory exists
                     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                    # Write the content to the file using UTF-8 encoding
                     with open(abs_path, 'w', encoding="utf-8") as f:
                         f.write(content)
-                    # Return a success message that includes the absolute path
                     return self._success(f"Successfully wrote to {abs_path}")
                 except Exception as e:
                     return self._error(f"Failed to write file: {str(e)}")
@@ -119,7 +111,14 @@ class FileTool(Tool):
             elif operation == "read":
                 if not os.path.exists(path):
                     return self._error(f"File not found: {path}")
-                with open(path) as f:
+                # If the path is a directory, list its contents automatically
+                if os.path.isdir(path):
+                    try:
+                        files = os.listdir(path)
+                        return self._success("\n".join(files))
+                    except Exception as e:
+                        return self._error(f"Error listing directory: {str(e)}")
+                with open(path, encoding="utf-8") as f:
                     content = f.read()
                 return self._success(content)
                 
@@ -131,7 +130,7 @@ class FileTool(Tool):
                 if not os.path.exists(path):
                     return self._error(f"File not found: {path}")
                     
-                with open(path) as f:
+                with open(path, encoding="utf-8") as f:
                     lines = f.readlines()
                 if start < 1 or end > len(lines):
                     return self._error(f"Line numbers out of range (1-{len(lines)})")
@@ -149,7 +148,7 @@ class FileTool(Tool):
                 if not os.path.exists(path):
                     return self._error(f"File not found: {path}")
                     
-                with open(path) as f:
+                with open(path, encoding="utf-8") as f:
                     lines = f.readlines()
                 if start < 1 or end > len(lines):
                     return self._error(f"Line numbers out of range (1-{len(lines)})")
@@ -157,7 +156,7 @@ class FileTool(Tool):
                 new_lines = content.splitlines()
                 lines[start-1:end] = [line + '\n' for line in new_lines]
                 
-                with open(path, 'w') as f:
+                with open(path, 'w', encoding="utf-8") as f:
                     f.writelines(lines)
                 return self._success(f"Successfully edited lines {start}-{end} in {path}")
                 
@@ -173,10 +172,7 @@ class FileTool(Tool):
             elif operation == "mkdir":
                 recursive = input.get("recursive", False)
                 try:
-                    if recursive:
-                        os.makedirs(path, exist_ok=True)
-                    else:
-                        os.makedirs(path, exist_ok=True)
+                    os.makedirs(path, exist_ok=True)
                     return self._success(f"Successfully created directory {path}")
                 except Exception as e:
                     return self._error(str(e))
@@ -185,7 +181,7 @@ class FileTool(Tool):
                 dest = input.get("dest")
                 if not dest:
                     return self._error("dest is required for copy operation")
-                dest = str(Path(dest).absolute())
+                dest = self._resolve_path(dest)
                 if not os.path.exists(path):
                     return self._error(f"Source not found: {path}")
                     
@@ -200,7 +196,7 @@ class FileTool(Tool):
                 dest = input.get("dest")
                 if not dest:
                     return self._error("dest is required for move operation")
-                dest = str(Path(dest).absolute())
+                dest = self._resolve_path(dest)
                 if not os.path.exists(path):
                     return self._error(f"Source not found: {path}")
                     
@@ -213,16 +209,14 @@ class FileTool(Tool):
                     return self._error("content is required for append operation")
                 if not os.path.exists(path):
                     return self._error(f"File not found: {path}")
-                with open(path, 'a') as f:
+                with open(path, 'a', encoding="utf-8") as f:
                     f.write(content)
                 return self._success(f"Successfully appended to {path}")
 
             elif operation == "list_dir":
                 try:
-                    # If no path specified or path is ".", use current directory
-                    if not path or path == "." or path == "./":
+                    if not path or path in [".", "./"]:
                         path = os.getcwd()
-                    # If relative path, make it relative to current directory
                     elif not os.path.isabs(path):
                         path = os.path.join(os.getcwd(), path)
                     
