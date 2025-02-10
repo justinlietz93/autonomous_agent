@@ -178,11 +178,8 @@ class InlineCallParser:
             self.buffer += text_chunk
             output_text = ""
 
-            # while True:
-            #     match = re.search(r'(?:^|\s+)(\w+)\s*\(', self.buffer, re.MULTILINE)
             while True:
                 match = re.search(r'\b(\w+)\s*\(', self.buffer)
-                 
                 if not match:
                     break
 
@@ -196,42 +193,75 @@ class InlineCallParser:
                     continue
 
                 start_index = match.start()
-                paren_level = 1
                 i = match.end()
+                paren_level = 1
+                in_quote = False
+                quote_delim = ""
+                escape = False
+
+                # NEW: Enhanced loop to handle quoted strings and triple-quoted strings
                 while i < len(self.buffer) and paren_level > 0:
-                    if self.buffer[i] == '(':
-                        paren_level += 1
-                    elif self.buffer[i] == ')':
-                        paren_level -= 1
-                    i += 1
+                    if escape:
+                        escape = False
+                        i += 1
+                        continue
+
+                    if not in_quote:
+                        # Check for triple-quoted strings first.
+                        if self.buffer[i:i+3] in ('"""', "'''"):
+                            in_quote = True
+                            quote_delim = self.buffer[i:i+3]
+                            i += 3
+                            continue
+                        # Then check for single-quoted strings.
+                        elif self.buffer[i] in ('"', "'"):
+                            in_quote = True
+                            quote_delim = self.buffer[i]
+                            i += 1
+                            continue
+                        else:
+                            if self.buffer[i] == '(':
+                                paren_level += 1
+                            elif self.buffer[i] == ')':
+                                paren_level -= 1
+                            i += 1
+                    else:
+                        # Inside a quoted string.
+                        if self.buffer[i] == '\\':
+                            escape = True
+                            i += 1
+                        elif self.buffer[i:i+len(quote_delim)] == quote_delim:
+                            in_quote = False
+                            i += len(quote_delim)
+                        else:
+                            i += 1
 
                 if paren_level != 0:
-                    # Incomplete call - keep buffer and break
+                    # Incomplete call; wait for more text.
                     break
 
-                # Extract ONLY the arguments between the parentheses
+                # Extract ONLY the arguments between the outer parentheses.
                 inline_call_str = self.buffer[start_index:i]
                 arg_start = inline_call_str.find('(') + 1
                 arg_str = inline_call_str[arg_start:-1]
 
                 parsed_args = self._parse_args(arg_str)
                 tool_call_json = self._format_tool_call(func_name, parsed_args)
-                
+
                 if debug:
                     print(f"DEBUG: Formatted JSON: {tool_call_json}")
 
-                # Send to parser and get result immediately
+                # Send the call to the RealTimeToolParser and get the result immediately.
                 tool_call_str = self.marker + json.dumps(tool_call_json)
                 result = self.rtp.feed(tool_call_str)
 
-                # Replace the inline call text with the tool result, so it actually
-                # shows up in final output rather than leaving the original inline call.
+                # Replace the inline call text with the tool result.
                 parsed_part = self.buffer[:start_index]
                 remaining_part = self.buffer[i:]
                 output_text += parsed_part + result
                 self.buffer = remaining_part
 
-            # Handle any remaining text
+            # Append any remaining text.
             if self.buffer:
                 output_text += self.buffer
                 self.buffer = ""
@@ -242,6 +272,7 @@ class InlineCallParser:
             return f"{self.buffer}\n[VALIDATION ERROR: {str(e)}]\n"
         except Exception as e:
             return f"{self.buffer}\n[ERROR: {str(e)}]\n"
+
 
     def _parse_args(self, args_str: str) -> Dict[str, Any]:
         """

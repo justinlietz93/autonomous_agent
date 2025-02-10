@@ -73,11 +73,36 @@ class FileTool(Tool):
             },
             "required": ["operation", "path"]
         }
-
-    def _resolve_path(self, path: str) -> str:
-        """Resolve a given path to an absolute path using the current working directory if needed."""
+    def _resolve_path(self, path: str, max_depth: int = 3) -> str:
+        """
+        Resolve a given path to an absolute path using the current working directory if needed.
+        If the resolved path does not exist, attempt a dynamic search (up to max_depth levels)
+        for a directory or file with the same basename.
+        """
         p = Path(path)
-        return str(p) if p.is_absolute() else str(Path.cwd() / p)
+        if p.is_absolute():
+            return str(p)
+        
+        # First, try resolving relative to current working directory.
+        resolved = Path.cwd() / p
+        if resolved.exists():
+            return str(resolved)
+        
+        # If not found, perform a dynamic search for a matching basename.
+        target_name = p.name
+        for root, dirs, files in os.walk(Path.cwd()):
+            # Limit the search depth:
+            depth = Path(root).relative_to(Path.cwd()).parts
+            if len(depth) > max_depth:
+                # Skip deeper directories
+                continue
+            # Look for a directory or file that matches the target name.
+            if target_name in dirs or target_name in files:
+                candidate = Path(root) / target_name
+                if candidate.exists():
+                    return str(candidate.resolve())
+        # Fall back to the initially resolved path (which may not exist).
+        return str(resolved)
 
     def run(self, input: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the requested file operation."""

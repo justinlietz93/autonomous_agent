@@ -1,0 +1,20 @@
+{
+    "version": "1.0.0",
+    "memory_layers": {
+        "short_term": {
+            "max_size": 1024,
+            "retention_period": "1h",
+            "path": "/media/justin/Samsung_4TB1/github/LLM_kit/memory/short_term"
+        },
+        "medium_term": {
+            "max_size": 10240,
+            "retention_period": "24h",
+            "path": "/media/justin/Samsung_4TB1/github/LLM_kit/memory/medium_term"
+        },
+        "long_term": {
+            "max_size": 102400,
+            "retention_period": "permanent",
+            "path": "/media/justin/Samsung_4TB1/github/LLM_kit/memory/long_term"
+        }
+    }
+}

@@ -48,6 +48,7 @@ class ToolManager:
             DocCheckTool(),
             PackageManagerTool(),
             CodeRunnerTool()
+
         ]
         for tool in default_tools:
             self.register_tool(tool)
