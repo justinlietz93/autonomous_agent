@@ -103,10 +103,18 @@ class FileTool(Tool):
 
                 if not content:
                     return self._error("content is required for write operation")
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, 'w') as f:
-                    f.write(content)
-                return self._success(f"Successfully wrote to {path}")
+                # Convert the provided path to an absolute path
+                abs_path = str(Path(path).absolute())
+                try:
+                    # Ensure the directory exists
+                    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+                    # Write the content to the file using UTF-8 encoding
+                    with open(abs_path, 'w', encoding="utf-8") as f:
+                        f.write(content)
+                    # Return a success message that includes the absolute path
+                    return self._success(f"Successfully wrote to {abs_path}")
+                except Exception as e:
+                    return self._error(f"Failed to write file: {str(e)}")
                 
             elif operation == "read":
                 if not os.path.exists(path):
@@ -210,18 +218,29 @@ class FileTool(Tool):
                 return self._success(f"Successfully appended to {path}")
 
             elif operation == "list_dir":
-                if not os.path.exists(path):
+                try:
+                    # If no path specified or path is ".", use current directory
+                    if not path or path == "." or path == "./":
+                        path = os.getcwd()
+                    # If relative path, make it relative to current directory
+                    elif not os.path.isabs(path):
+                        path = os.path.join(os.getcwd(), path)
+                    
+                    if not os.path.exists(path):
+                        return {
+                            "type": "tool_response",
+                            "tool_use_id": "",
+                            "content": f"Directory not found: {path}"
+                        }
+                        
+                    files = os.listdir(path)
                     return {
-                        "type": "tool_response",
+                        "type": "tool_response", 
                         "tool_use_id": "",
-                        "content": f"Directory not found: {path}"
+                        "content": "\n".join(files)
                     }
-                files = os.listdir(path)
-                return {
-                    "type": "tool_response", 
-                    "tool_use_id": "",
-                    "content": "\n".join(files)
-                }
+                except Exception as e:
+                    return self._error(f"Error listing directory: {str(e)}")
                 
             else:
                 return self._error(f"Unknown operation: {operation}")

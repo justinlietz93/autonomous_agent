@@ -54,6 +54,7 @@ class InlineCallParser:
         "file_read": "file",
         "file_write": "file",
         "file_delete": "file",
+        "list_dir": "file",
         "web_search": "web_search",
         "web_browser": "web_browser",
         "http_request": "http_request",

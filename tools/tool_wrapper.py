@@ -1,20 +1,79 @@
-# tool_wrapper.py
-# A placeholder that used to manage partial tool calls. 
-# With the new approach in main_autonomous.py, it's no longer the main orchestrator.
-
 import json
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from openai import OpenAI
+from dotenv import load_dotenv
 from .tool_base import Tool
 
 class ToolWrapper:
-    def __init__(self, model_provider=None):
-        self.client = None
+    """Wrapper to use tools with Deepseek Reasoner through prompt engineering."""
+    
+    def __init__(self):
+        load_dotenv()
+        self.client = OpenAI(
+            api_key=os.getenv("DEEPSEEK_API_KEY"),
+            base_url="https://api.deepseek.com"
+        )
         self.tools = {}
-        self.model_provider = model_provider
-
+        
+    def _convert_schema_to_nl(self, schema: Dict) -> str:
+        """Convert JSONSchema to natural language description."""
+        nl_desc = []
+        for name, details in schema.get("properties", {}).items():
+            desc = details.get("description", "No description available")
+            type_info = details.get("type", "any")
+            required = name in schema.get("required", [])
+            nl_desc.append(f"- {name} ({type_info}{'*' if required else ''}): {desc}")
+        return "\n".join(nl_desc)
+        
     def register_tool(self, tool: Tool):
-        self.tools[tool.name] = tool
+        """Register a tool with a natural language description."""
+        self.tools[tool.name] = {
+            "tool": tool,
+            "description": tool.description,
+            "schema": self._convert_schema_to_nl(tool.input_schema)
+        }
+    
 
-    def execute(self, prompt: str) -> str:
-        return "Execution logic omitted. We rely on main_autonomous instead."
+    def _extract_tool_call(self, content: str) -> Optional[Dict[str, Any]]:
+        """Extract and parse tool call from model response."""
+        try:
+            if "TOOL_CALL:" not in content:
+                return None
+                
+            tool_json = content.split("TOOL_CALL:")[1].strip()
+            return json.loads(tool_json)
+        except Exception as e:
+            print(f"Error parsing tool call: {e}")
+            return None
+
+    def execute(self, user_input: str) -> str:
+        """Execute a tool based on user input."""
+        try:
+            # Get model's response
+            response = self.client.chat.completions.create(
+                model="deepseek-reasoner",
+                messages=[
+                    {"role": "system", "content": self._create_system_prompt()},
+                    {"role": "user", "content": user_input}
+                ]
+            )
+            
+            # Get reasoning and potential tool call
+            reasoning = response.choices[0].message.reasoning_content
+            tool_call = self._extract_tool_call(response.choices[0].message.content)
+            
+            if not tool_call:
+                return f"Reasoning:\n{reasoning}\n\nNo valid tool call was made."
+                
+            # Validate tool exists
+            if tool_call["tool"] not in self.tools:
+                return f"Reasoning:\n{reasoning}\n\nError: Tool '{tool_call['tool']}' not found."
+                
+            # Execute tool
+            result = self.tools[tool_call["tool"]]["tool"].run(tool_call["input_schema"])
+            
+            return f"Reasoning:\n{reasoning}\n\nTool Call:\n{json.dumps(tool_call, indent=2)}\n\nResult:\n{result}"
+            
+        except Exception as e:
+            return f"Error executing tool: {str(e)}" 
