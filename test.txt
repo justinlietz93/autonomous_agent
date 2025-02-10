@@ -1,1 +1,0 @@
-This is a test file\nCreated for tool validation\nLine 3
