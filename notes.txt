@@ -1,0 +1,2 @@
+# Always use these flags
+/usr/bin/python3.12 -m venv venv --clear --copies

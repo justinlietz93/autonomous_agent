@@ -265,60 +265,44 @@ class RealTimeToolParser:
                 context=self._recent_context
             )
 
-        tool_func = self.tools[tool_name]
+        tool_object = self.tools[tool_name]
 
-        # Signature check
-        sig = inspect.signature(tool_func)
+        # Signature check on the run method
+        sig = inspect.signature(tool_object.run)
         try:
-            sig.bind(**inputs)  # Raises TypeError if mismatch
+            sig.bind(input=inputs)  # Validate against run method's signature
         except TypeError as te:
             raise ToolCallError(
                 f"Tool call argument mismatch: {te}",
                 context=self._recent_context
             )
 
-        # Basic type hint checking
-        hints = typing.get_type_hints(tool_func)
-        for param, value in inputs.items():
-            if param in hints:
-                expected_type = hints[param]
-                if hasattr(expected_type, "__origin__"):
-                    # We skip deep checks for complex generics (Union, list, etc.)
-                    continue
-                if expected_type is typing.Any:
-                    continue
-                # Perform a simple isinstance check
-                if not isinstance(value, expected_type):
-                    raise ToolCallError(
-                        f"Argument '{param}' expected {expected_type.__name__}, got {type(value).__name__}",
-                        context=self._recent_context
-                    )
-
-        # If all validations pass, execute the tool
+        # Execute the tool's run method
         try:
-            result = tool_func(**inputs)
+            result = tool_object.run(input=inputs)
+            
+            # Log success
+            self.history.append({
+                "time": datetime.now().isoformat(),
+                "tool": tool_name,
+                "input": inputs,
+                "output": result,
+                "status": "successfully called tool"
+            })
+
+            # Format and return the result
+            if isinstance(result, dict):
+                if 'content' in result:
+                    return str(result['content'])
+                elif 'output' in result:
+                    return str(result['output'])
+            return str(result)
+
         except Exception as ex:
             raise ToolCallError(
                 f"Tool '{tool_name}' execution failed: {ex}",
                 context=self._recent_context
             )
-
-        print(f"DEBUG: tool_name = {tool_name}, inputs = {inputs}, result = {result}")
-        # Log success
-        self.history.append({
-            "time": datetime.now().isoformat(),
-            "tool": tool_name,
-            "input": inputs,
-            "output": result,
-            "status": "successfully called tool"
-        })
-        print(f"DEBUG: History after append: {self.history}")
-        self.consecutive_failures = 0
-
-        # Optionally, place a marker or result text back into the conversation context
-        integration_text = f"[Tool result: {result}]"
-        self._recent_context += integration_text
-
 
     def get_history(self):
         """Retrieve log of tool calls (for debugging or storing in a DB)."""

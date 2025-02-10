@@ -123,3 +123,26 @@ Options:
 > ```bash
 > ollama serve
 > ```
+
+## Development Setup
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd LLM_kit
+   ```
+
+2. Run the setup script:
+   ```bash
+   ./setup_env.sh
+   ```
+
+3. Activate the virtual environment:
+   ```bash
+   source venv/bin/activate
+   ```
+
+To deactivate the virtual environment:
+```bash
+deactivate
+```

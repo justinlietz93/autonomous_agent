@@ -59,26 +59,26 @@ class WebBrowserTool(Tool):
             "additionalProperties": False
         }
 
-    def run(self, tool_call_id: str, **kwargs) -> ToolResult:
+    def run(self, input: Dict[str, Any], tool_call_id: str = "") -> Dict[str, Any]:
         """
-        Fetch and parse web page content.
+        Fetch a webpage and optionally extract specific content.
         
         Args:
-            tool_call_id: Unique ID for this tool call
-            url: The URL to fetch
-            extract_type: Type of content to extract (default: "text")
-            timeout: Request timeout in seconds (default: 10)
+            input: Dictionary containing:
+                url: The URL to fetch
+                extract_links: Optional bool to extract links
+            tool_call_id: Optional tool call identifier
             
         Returns:
-            ToolResult containing parsed content or error message
+            Dict containing the fetched content
         """
         try:
-            url = kwargs.get("url")
+            url = input.get("url")
             if not url:
                 raise ValueError("URL is required")
 
-            extract_type = kwargs.get("extract_type", "text").lower()
-            timeout = min(max(1, kwargs.get("timeout", 10)), 30)
+            extract_type = input.get("extract_type", "text").lower()
+            timeout = min(max(1, input.get("timeout", 10)), 30)
 
             response = requests.get(url, headers=self.headers, timeout=timeout)
             response.raise_for_status()

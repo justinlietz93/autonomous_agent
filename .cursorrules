@@ -62,544 +62,583 @@ LLM_kit/
         ├── types.py
         ├── web_browser_tool.py
         └── web_search_tool.py
-```
 </CODEBASE_MAP>
 
-<TOOL_FORMAT>
-Our goal for the tool calls is that we want the LLM to call tools like this:
+<TOOL_FORMAT> Our goal for the tool calls is that we want the LLM to call tools like this:
 
-web_search("latest advancements in AI", max_results=5)  
-code_runner("print('Checking system uptime')", language="python")  
-http_request("GET", "https://api.github.com/repos/justin/Samsung_4TB/github/LLM_kit/pulls")  
-package_manager("list")  
-file_read("/media/justin/Samsung_4TB/github/LLM_kit/current_status.md")  
-documentation_check("/media/justin/Samsung_4TB/github/LLM_kit/docs.md")  
-shell("df -h")  
-computer("type", text="System check complete")  
-file_write("/media/justin/Samsung_4TB/github/LLM_kit/log.txt", "Performed system and environment checks.")  
-web_browser("https://github.com/justin/Samsung_4TB/github/LLM_kit/issues", extract_links=True)  
-shell("echo 'Continuing operations'")  
-package_manager("install", "requests")  
-code_runner("import requests; print('Requests module loaded')", language="python")  
-http_request("GET", "https://api.github.com/repos/justin/Samsung_4TB/github/status")  
-file_delete("/media/justin/Samsung_4TB/github/LLM_kit/temp_file.txt")  
-shell("top -b -n1 | head -5")  
-web_search("efficient file management techniques", max_results=3)  
+LLM -> formatter -> parser -> function executor -> smoother -> User
+
+web_search("latest advancements in AI", max_results=5)
+code_runner("print('Checking system uptime')", language="python")
+http_request("GET", "https://api.github.com/repos/justin/Samsung_4TB/github/LLM_kit/pulls")
+package_manager("list")
+file_read("/media/justin/Samsung_4TB/github/LLM_kit/current_status.md")
+documentation_check("/media/justin/Samsung_4TB/github/LLM_kit/docs.md")
+shell("df -h")
+computer("type", text="System check complete")
+file_write("/media/justin/Samsung_4TB/github/LLM_kit/log.txt", "Performed system and environment checks.")
+web_browser("https://github.com/justin/Samsung_4TB/github/LLM_kit/issues", extract_links=True)
+shell("echo 'Continuing operations'")
+package_manager("install", "requests")
+code_runner("import requests; print('Requests module loaded')", language="python")
+http_request("GET", "https://api.github.com/repos/justin/Samsung_4TB/github/status")
+file_delete("/media/justin/Samsung_4TB/github/LLM_kit/temp_file.txt")
+shell("top -b -n1 | head -5")
+web_search("efficient file management techniques", max_results=3)
 code_runner("print('End of current session actions')", language="python")
 
 and our code will turn them into structured JSON tool calls to feed to the function executor like this
 
-TOOL_CALL: {
-    "tool": "file_tool",
-    "input_schema": {
-        "operation": "read",
-        "path": "README.md"
-    }
-}
-TOOL_CALL: {
-    "tool": "file_tool", 
-    "input_schema": {
-        "operation": "write",
-        "path": "test_output.txt",
-        "content": "This is a test file created by the tool parser test."
-    }
-}
-TOOL_CALL: {
-    "tool": "file_tool",
-    "input_schema": {
-        "operation": "read",
-        "path": "test_output.txt"
-    }
-}
+TOOL_CALL: { "tool": "file", "input_schema": { "operation": "read", "path": "README.md" } } TOOL_CALL: { "tool": "file", "input_schema": { "operation": "write", "path": "test_output.txt", "content": "This is a test file created by the tool parser test." } } TOOL_CALL: { "tool": "file", "input_schema": { "operation": "read", "path": "test_output.txt" } }
 
 that will cause a function to be executed programmatically.
 
+PROMPT = """ TOOL MENU
+!! WARNING: CRITICAL NOTICE !!
+
+IT IS CRUCIAL THAT YOU FOLLOW THE EXACT TOOL CALL FORMATTING. INCORRECT TOOL CALLS WILL CAUSE THE SYSTEM TO FAIL.
+
+!! WARNING: CRITICAL NOTICE !!
+
+FILE (file)
+Use for reading, writing, editing, deleting, or managing directories/files. Examples (bridging format): file_read("notes.txt") file_write("notes.txt", "New content") file_delete("oldfile.txt") file("append", "log.txt", "Additional text") file("list_dir", "/some/folder", recursive=True)
+CORRECT USAGE:
+
+CODE RUNNER (code_runner)
+Run code in Python, TypeScript, Go, or Rust (with optional arguments). Example: code_runner("print('Hello')", language="python")
+COMPUTER (computer)
+Interact with the system's UI, check hardware info, or take screenshots. Examples: computer("system_info") computer("screenshot")
+DOCUMENTATION CHECK (documentation_check)
+Validate local docs or check external doc sites. Example: documentation_check("docs/readme.md")
+WEB SEARCH (web_search)
+Search or fetch info from a URL. Examples: web_search("latest python docs", max_results=3) web_search("https://example.com")
+WEB BROWSER (web_browser)
+Fetch a webpage with optional extraction of text, links, or title. Example: web_browser("https://docs.python.org", extract_links=True)
+HTTP REQUEST (http_request)
+Make GET/POST/PUT/DELETE requests, optionally including headers/data. Example: http_request("GET", "https://api.example.com/data")
+SHELL (shell)
+Execute shell commands with optional timeout or working directory. Example: shell("ls -al")
+PACKAGE MANAGER (package_manager)
+Install, list, or uninstall Python packages. Examples: package_manager("install", "requests") package_manager("list")
+SHOW SCHEMA
+For exact input fields, add: "show_schema: <tool_name>" in your reasoning.
+INCORRECT USAGE:
+
+
+ ```python
+ def process_chunk(self, chunk):
+     max_token = 1024
+     chunks = []
+     while len(chunk) > max_token:
+         chunks.append(chunk[:max_token])
+         chunk = chunk[max_token:]
+     chunks.append(chunk)
+     return chunks
+ ```
+
+```bash
+ file read --path "memory_best_practices.md"
+ ```
+
+```bash
+ code_runner --file "tests.py" --command "python -m unittest"
+ ```
+
+```bash
+ shell --command "ls -l"
+ ```
+You have access to the following tools that you can call directly:
+
+Examples of valid tool calls: file_read("memory/context_logs/context_20250208_023434_autonomous_session_01.txt")
+shell("ls -l memory/context_logs") code_runner("print('Hello')", language="python") web_search("latest AI developments", max_results=5) http_request("GET", "https://api.github.com/repos/owner/repo/issues") package_manager("list") web_browser("https://github.com", extract_links=True)
+
+Format your tool calls exactly like the examples above - no special wrapping or formatting. The tools will be executed when you call them.
+
+Available tools:
+
+file_read(path): Read contents of a file
+file_write(path, content): Write content to a file
+shell(command): Execute shell command
+code_runner(code, language="python"): Run code snippet
+web_search(query, max_results=5): Search the web
+http_request(method, url): Make HTTP request
+package_manager(action, package=""): Manage packages
+web_browser(url, extract_links=False): Browse webpage
+Always use the exact format shown in the examples. Do not wrap tool calls in any special formatting. Tool calls will be executed immediately when formatted correctly. """
+
+<!-- TOOL CALL PATTERNS --> <!-- We support two ways to define how the tool function is invoked: 1) SINGLE-ARGUMENT PATTERN - Each tool has a signature like: def run(self, input: Dict[str, Any]) -> Dict[str, Any]: - The parser passes all fields under one keyword argument named 'input'. - Example JSON: { "tool": "file", "input_schema": { "operation": "write", "path": "some/path", "content": "data" } } Then the executor calls: tool_func(input={"operation": "write", "path": "some/path", "content": "data"}) 2) MULTI-ARGUMENT PATTERN - Each tool has separate parameters, e.g.: def run(self, operation: str, path: str, content: Optional[str]) -> Dict[str, Any]: - The parser passes them individually like: tool_func(operation="write", path="some/path", content="data") - Example JSON: { "tool": "file", "input_schema": { "operation": "write", "path": "some/path", "content": "data" } } Currently, THIS CODEBASE uses the SINGLE-ARGUMENT approach (i.e. 'run(self, input: Dict[str, Any])'). Therefore, the RealTimeToolParser is configured to do: sig.bind(input=inputs) result = tool_func(input=inputs) If you switch to multi-argument style, be sure to update: - The tool signatures (run(self, operation, path, content, etc.)) - The parser's code that calls tool_func(**inputs). -->
 </TOOL_FORMAT>
 
+php-template
+Copy
+Edit
+<!-- ========================= -->
+<!-- CRITICAL WARNING SECTION -->
+<!-- ========================= -->
+<CRITICAL-WARNING>
+<INSTRUCTIONS>
+<Point>
+    WE WILL ALWAYS CHECK THREE TIMES BEFORE AND AFTER WE DO ANYTHING
+    <EXAMPLE>
+        # Example of checking three times:
+        
+        1. BEFORE STARTING:
+        - Check if we have the correct file path
+        - Verify we have necessary permissions
+        - Validate input parameters
+        
+        2. DURING EXECUTION:
+        - Monitor operation progress
+        - Verify each step completes successfully
+        - Validate intermediate results
+        
+        3. AFTER COMPLETION:
+        - Verify the changes were applied correctly
+        - Check for any unintended side effects
+        - Confirm system state is consistent
+        
+        CONCRETE EXAMPLE:
+        When modifying a file:
+        
+        PRE-CHECKS:
+        - Does file exist? ✓
+        - Do we have write permissions? ✓
+        - Is content valid? ✓
+        
+        DURING:
+        - Backup created? ✓
+        - Changes applied correctly? ✓
+        - No errors during write? ✓
+        
+        POST-CHECKS:
+        - File saved properly? ✓
+        - Content validates? ✓
+        - System stable? ✓
+    </EXAMPLE>
+</Point>
+<Point>DO NOT ASK UNNECESSARY QUESTIONS</Point>
+<Point>DO NOT ASK FOR PERMISSION WHEN ITS OBVIOUS WHAT YOU NEED TO DO</Point>
+<Point>DO NOT ASK FOR PERMISSION TO DO SOMETHING THAT YOU KNOW YOU NEED TO DO</Point>
+</INSTRUCTIONS>
+<DEPRECATED-MODELS-DO-NOT-USE>
+    DEPRECATED_MODELS = {
+        "claude-1.3": "November 6th, 2024",
+        "claude-1.3-100k": "November 6th, 2024",
+        "claude-instant-1.1": "November 6th, 2024",
+        "claude-instant-1.1-100k": "November 6th, 2024",
+        "claude-instant-1.2": "November 6th, 2024",
+        "claude-3-sonnet-20240229": "July 21st, 2025",
+        "claude-2.1": "July 21st, 2025",
+        "claude-2.0": "July 21st, 2025"
+    }
+</DEPRECATED-MODELS-DO-NOT-USE>
+</CRITICAL-WARNING>
 
-    <!-- ========================= -->
-    <!-- CRITICAL WARNING SECTION -->
-    <!-- ========================= -->
-    <CRITICAL-WARNING>
-    <INSTRUCTIONS>
-    <Point>
-        WE WILL ALWAYS CHECK THREE TIMES BEFORE AND AFTER WE DO ANYTHING
-        <EXAMPLE>
-            # Example of checking three times:
-            
-            1. BEFORE STARTING:
-            - Check if we have the correct file path
-            - Verify we have necessary permissions
-            - Validate input parameters
-            
-            2. DURING EXECUTION:
-            - Monitor operation progress
-            - Verify each step completes successfully
-            - Validate intermediate results
-            
-            3. AFTER COMPLETION:
-            - Verify the changes were applied correctly
-            - Check for any unintended side effects
-            - Confirm system state is consistent
-            
-            CONCRETE EXAMPLE:
-            When modifying a file:
-            
-            PRE-CHECKS:
-            - Does file exist? ✓
-            - Do we have write permissions? ✓
-            - Is content valid? ✓
-            
-            DURING:
-            - Backup created? ✓
-            - Changes applied correctly? ✓
-            - No errors during write? ✓
-            
-            POST-CHECKS:
-            - File saved properly? ✓
-            - Content validates? ✓
-            - System stable? ✓
-        </EXAMPLE>
-    </Point>
-    <Point>DO NOT ASK UNNECESSARY QUESTIONS</Point>
-    <Point>DO NOT ASK FOR PERMISSION WHEN ITS OBVIOUS WHAT YOU NEED TO DO</Point>
-    <Point>DO NOT ASK FOR PERMISSION TO DO SOMETHING THAT YOU KNOW YOU NEED TO DO</Point>
-    </INSTRUCTIONS>
-            <!-- Models to avoid usage -->
-        <DEPRECATED-MODELS-DO-NOT-USE>
-            DEPRECATED_MODELS = {
-                "claude-1.3": "November 6th, 2024",
-                "claude-1.3-100k": "November 6th, 2024",
-                "claude-instant-1.1": "November 6th, 2024",
-                "claude-instant-1.1-100k": "November 6th, 2024",
-                "claude-instant-1.2": "November 6th, 2024",
-                "claude-3-sonnet-20240229": "July 21st, 2025",
-                "claude-2.1": "July 21st, 2025",
-                "claude-2.0": "July 21st, 2025"
-            }
-        </DEPRECATED-MODELS-DO-NOT-USE>
-    </CRITICAL-WARNING>
+<!-- ======================= -->
+<!-- MINI INDEX OF RULE SETS -->
+<!-- ======================= -->
+<MiniIndex>
+    <!-- BLOCKING -->
+    <Reference index="1" title="TEST-DRIVEN DEVELOPMENT" priority="BLOCKING"/>
+    <Reference index="4" title="TESTING STANDARDS" priority="BLOCKING"/>
+    <Reference index="19" title="TOOL BASE PRESERVATION" priority="BLOCKING"/>
 
-    <!-- ======================= -->
-    <!-- MINI INDEX OF RULE SETS -->
-    <!-- ======================= -->
-    <MiniIndex>
-        <!-- BLOCKING -->
-        <Reference index="1" title="TEST-DRIVEN DEVELOPMENT" priority="BLOCKING"/>
-        <Reference index="4" title="TESTING STANDARDS" priority="BLOCKING"/>
-        <Reference index="19" title="TOOL BASE PRESERVATION" priority="BLOCKING"/>
+    <!-- CRITICAL -->
+    <Reference index="7" title="AUTOMATION &amp; HUMAN INTERACTION" priority="CRITICAL"/>
 
-        <!-- CRITICAL -->
-        <Reference index="7" title="AUTOMATION &amp; HUMAN INTERACTION" priority="CRITICAL"/>
+    <!-- NORMAL -->
+    <Reference index="2" title="CODE ORGANIZATION" priority="NORMAL"/>
+    <Reference index="3" title="DEPENDENCY MANAGEMENT" priority="NORMAL"/>
+    <Reference index="5" title="SYSTEM ARCHITECTURE" priority="NORMAL"/>
+    <Reference index="6" title="PERFORMANCE &amp; SCALING" priority="NORMAL"/>
+    <Reference index="8" title="KNOWLEDGE MANAGEMENT" priority="NORMAL"/>
+    <Reference index="9" title="GOAL TRACKING &amp; SUCCESS METRICS" priority="NORMAL"/>
+    <Reference index="10" title="AUTONOMOUS OPERATIONS" priority="NORMAL"/>
+    <Reference index="11" title="READING FILES" priority="NORMAL"/>
+    <Reference index="12" title="EDITING FILES" priority="NORMAL"/>
+    <Reference index="13" title="CODEBASE SEARCHES" priority="NORMAL"/>
+    <Reference index="14" title="EXECUTING COMMANDS" priority="NORMAL"/>
+    <Reference index="15" title="DIRECTORY TOOL" priority="NORMAL"/>
+    <Reference index="16" title="PARALLEL EDIT TOOL" priority="NORMAL"/>
+    <Reference index="17" title="HANDOFF SUMMARY TEMPLATE" priority="NORMAL"/>
+    <!-- NEW ADDITION FOR ITERATIVE CONTEXT -->
+    <Reference index="18" title="ITERATIVE LLM CONTEXT" priority="NORMAL"/>
+</MiniIndex>
 
-        <!-- NORMAL -->
-        <Reference index="2" title="CODE ORGANIZATION" priority="NORMAL"/>
-        <Reference index="3" title="DEPENDENCY MANAGEMENT" priority="NORMAL"/>
-        <Reference index="5" title="SYSTEM ARCHITECTURE" priority="NORMAL"/>
-        <Reference index="6" title="PERFORMANCE &amp; SCALING" priority="NORMAL"/>
-        <Reference index="8" title="KNOWLEDGE MANAGEMENT" priority="NORMAL"/>
-        <Reference index="9" title="GOAL TRACKING &amp; SUCCESS METRICS" priority="NORMAL"/>
-        <Reference index="10" title="AUTONOMOUS OPERATIONS" priority="NORMAL"/>
-        <Reference index="11" title="READING FILES" priority="NORMAL"/>
-        <Reference index="12" title="EDITING FILES" priority="NORMAL"/>
-        <Reference index="13" title="CODEBASE SEARCHES" priority="NORMAL"/>
-        <Reference index="14" title="EXECUTING COMMANDS" priority="NORMAL"/>
-        <Reference index="15" title="DIRECTORY TOOL" priority="NORMAL"/>
-        <Reference index="16" title="PARALLEL EDIT TOOL" priority="NORMAL"/>
-        <Reference index="17" title="HANDOFF SUMMARY TEMPLATE" priority="NORMAL"/>
-        <!-- NEW ADDITION FOR ITERATIVE CONTEXT -->
-        <Reference index="18" title="ITERATIVE LLM CONTEXT" priority="NORMAL"/>
-    </MiniIndex>
+<!-- ========================= -->
+<!-- BLOCKING PRIORITY RULES  -->
+<!-- ========================= -->
+<Priority name="BLOCKING">
 
-    <!-- ========================= -->
-    <!-- BLOCKING PRIORITY RULES  -->
-    <!-- ========================= -->
-    <Priority name="BLOCKING">
+    <Rule index="1" title="TEST-DRIVEN DEVELOPMENT">
+        <Points>
+            <Point>Tests MUST be created and passing before implementation</Point>
+            <Point>Create test file first</Point>
+            <Point>Implement until tests pass</Point>
+            <Point>No exceptions to this rule</Point>
+            <Point>Tests must be comprehensive and cover edge cases</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="1" title="TEST-DRIVEN DEVELOPMENT">
-            <Points>
-                <Point>Tests MUST be created and passing before implementation</Point>
-                <Point>Create test file first</Point>
-                <Point>Implement until tests pass</Point>
-                <Point>No exceptions to this rule</Point>
-                <Point>Tests must be comprehensive and cover edge cases</Point>
-            </Points>
-        </Rule>
+    <Rule index="4" title="TESTING STANDARDS">
+        <Points>
+            <Point>ALWAYS ACKNOWLEDGE THE FAILURE MESSAGES AND TRACEBACKS</Point>
+            <Point>Every module requires corresponding test</Point>
+            <Point>Tests must be comprehensive</Point>
+            <Point>Follow test naming conventions</Point>
+            <Point>Include performance and resource tests</Point>
+            <Point>Test all toggleable components independently</Point>
+            <Point>Test module unplugging and rerouting scenarios</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="4" title="TESTING STANDARDS">
-            <Points>
-                <Point>ALWAYS ACKNOWLEDGE THE FAILURE MESSAGES AND TRACEBACKS</Point>
-                <Point>Every module requires corresponding test</Point>
-                <Point>Tests must be comprehensive</Point>
-                <Point>Follow test naming conventions</Point>
-                <Point>Include performance and resource tests</Point>
-                <Point>Test all toggleable components independently</Point>
-                <Point>Test module unplugging and rerouting scenarios</Point>
-            </Points>
-        </Rule>
+    <Rule index="19" title="TOOL BASE PRESERVATION">
+        <Points>
+            <Point>NEVER modify the tool_base.py file - it is a critical foundation</Point>
+            <Point>All tools must inherit from and comply with the existing Tool class interface</Point>
+            <Point>The Tool class signature must remain: def run(self, input: Dict[str, Any]) -> Dict[str, Any]</Point>
+            <Point>New tool functionality should adapt to the base class, not vice versa</Point>
+            <Point>If base class changes are needed, create a new base class instead</Point>
+            <Point>Document any workarounds needed to maintain tool_base.py compatibility</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="19" title="TOOL BASE PRESERVATION">
-            <Points>
-                <Point>NEVER modify the tool_base.py file - it is a critical foundation</Point>
-                <Point>All tools must inherit from and comply with the existing Tool class interface</Point>
-                <Point>The Tool class signature must remain: def run(self, input: Dict[str, Any]) -> Dict[str, Any]</Point>
-                <Point>New tool functionality should adapt to the base class, not vice versa</Point>
-                <Point>If base class changes are needed, create a new base class instead</Point>
-                <Point>Document any workarounds needed to maintain tool_base.py compatibility</Point>
-            </Points>
-        </Rule>
+</Priority>
 
-    </Priority>
+<!-- ========================== -->
+<!-- CRITICAL PRIORITY RULES   -->
+<!-- ========================== -->
+<Priority name="CRITICAL">
 
-    <!-- ========================== -->
-    <!-- CRITICAL PRIORITY RULES   -->
-    <!-- ========================== -->
-    <Priority name="CRITICAL">
+    <Rule index="7" title="AUTOMATION &amp; HUMAN INTERACTION">
+        <Points>
+            <Point>System must be self-maintaining and self-extending</Point>
+            <Point>NO human code contributions unless absolutely necessary</Point>
+            <Point>All code changes must be AI-driven and automatically tested</Point>
+            <Point>Human role is limited to high-level goals and critical decisions</Point>
+            <Point>System must self-document and maintain its own standards</Point>
+            <Point>All routine maintenance must be automated</Point>
+            <Point>System must validate its own changes</Point>
+            <Point>Changes must be automatically rolled back if validation fails</Point>
+            <Point>Human overrides require explicit justification and logging</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="7" title="AUTOMATION &amp; HUMAN INTERACTION">
-            <Points>
-                <Point>System must be self-maintaining and self-extending</Point>
-                <Point>NO human code contributions unless absolutely necessary</Point>
-                <Point>All code changes must be AI-driven and automatically tested</Point>
-                <Point>Human role is limited to high-level goals and critical decisions</Point>
-                <Point>System must self-document and maintain its own standards</Point>
-                <Point>All routine maintenance must be automated</Point>
-                <Point>System must validate its own changes</Point>
-                <Point>Changes must be automatically rolled back if validation fails</Point>
-                <Point>Human overrides require explicit justification and logging</Point>
-            </Points>
-        </Rule>
+</Priority>
 
-    </Priority>
+<!-- ========================= -->
+<!-- NORMAL PRIORITY RULES    -->
+<!-- ========================= -->
+<Priority name="NORMAL">
 
-    <!-- ========================= -->
-    <!-- NORMAL PRIORITY RULES    -->
-    <!-- ========================= -->
-    <Priority name="NORMAL">
+    <Rule index="2" title="CODE ORGANIZATION">
+        <Points>
+            <Point>NO docstrings in file headers, use hashtags only</Point>
+            <Point>Follow standards/ folder conventions</Point>
+            <Point>Review relevant standards before changes</Point>
+            <Point>Maintain modular architecture</Point>
+            <Point>Keep core components pluggable and toggleable</Point>
+            <Point>Each module must support safe "hot-unplugging"</Point>
+            <Point>Pipeline rerouting must be possible but NEVER at cost of simplicity</Point>
+            <Point>If unplugging/rerouting adds complexity, keep it simple instead</Point>
+            <Point>Module dependencies must be explicit and documented</Point>
+            <Point>All tools must adapt to tool_base.py interface, never modify the base</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="2" title="CODE ORGANIZATION">
-            <Points>
-                <Point>NO docstrings in file headers, use hashtags only</Point>
-                <Point>Follow standards/ folder conventions</Point>
-                <Point>Review relevant standards before changes</Point>
-                <Point>Maintain modular architecture</Point>
-                <Point>Keep core components pluggable and toggleable</Point>
-                <Point>Each module must support safe "hot-unplugging"</Point>
-                <Point>Pipeline rerouting must be possible but NEVER at cost of simplicity</Point>
-                <Point>If unplugging/rerouting adds complexity, keep it simple instead</Point>
-                <Point>Module dependencies must be explicit and documented</Point>
-                <Point>All tools must adapt to tool_base.py interface, never modify the base</Point>
-            </Points>
-        </Rule>
+    <Rule index="3" title="DEPENDENCY MANAGEMENT">
+        <Points>
+            <Point>Check dependencies.json before adding packages</Point>
+            <Point>Verify against tech_knowledge.xml for new packages</Point>
+            <Point>Create tests for all dependencies</Point>
+            <Point>Monitor token costs and usage</Point>
+            <Point>Track API dependencies separately</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="3" title="DEPENDENCY MANAGEMENT">
-            <Points>
-                <Point>Check dependencies.json before adding packages</Point>
-                <Point>Verify against tech_knowledge.xml for new packages</Point>
-                <Point>Create tests for all dependencies</Point>
-                <Point>Monitor token costs and usage</Point>
-                <Point>Track API dependencies separately</Point>
-            </Points>
-        </Rule>
+    <Rule index="5" title="SYSTEM ARCHITECTURE">
+        <Points>
+            <Point>Maintain agent isolation and specialization</Point>
+            <Point>Keep memory system minimal but extensible</Point>
+            <Point>Ensure proper error handling and logging</Point>
+            <Point>Follow autonomous operation principles</Point>
+            <Point>Implement proper feedback loops</Point>
+            <Point>Support graceful degradation of features</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="5" title="SYSTEM ARCHITECTURE">
-            <Points>
-                <Point>Maintain agent isolation and specialization</Point>
-                <Point>Keep memory system minimal but extensible</Point>
-                <Point>Ensure proper error handling and logging</Point>
-                <Point>Follow autonomous operation principles</Point>
-                <Point>Implement proper feedback loops</Point>
-                <Point>Support graceful degradation of features</Point>
-            </Points>
-        </Rule>
+    <Rule index="6" title="PERFORMANCE &amp; SCALING">
+        <Points>
+            <Point>Monitor and optimize token usage</Point>
+            <Point>Keep core system lightweight</Point>
+            <Point>Maintain sub-100ms response times</Point>
+            <Point>Design for future distributed processing</Point>
+            <Point>Consider resource constraints</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="6" title="PERFORMANCE &amp; SCALING">
-            <Points>
-                <Point>Monitor and optimize token usage</Point>
-                <Point>Keep core system lightweight</Point>
-                <Point>Maintain sub-100ms response times</Point>
-                <Point>Design for future distributed processing</Point>
-                <Point>Consider resource constraints</Point>
-            </Points>
-        </Rule>
+    <Rule index="8" title="KNOWLEDGE MANAGEMENT">
+        <Points>
+            <Point>Maintain up-to-date tech knowledge base by running the data\tech_knowledge_updater.py script, then looking in the data\tech_trends.json</Point>
+            <Point>Auto-update package and dependency information</Point>
+            <Point>Track breaking changes and deprecations</Point>
+            <Point>Knowledge must be versioned and rollback-capable</Point>
+            <Point>System must learn from past decisions</Point>
+            <Point>Knowledge updates must not disrupt running operations</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="8" title="KNOWLEDGE MANAGEMENT">
-            <Points>
-                <Point>Maintain up-to-date tech knowledge base by running the data\tech_knowledge_updater.py script, then looking in the data\tech_trends.json</Point>
-                <Point>Auto-update package and dependency information</Point>
-                <Point>Track breaking changes and deprecations</Point>
-                <Point>Knowledge must be versioned and rollback-capable</Point>
-                <Point>System must learn from past decisions</Point>
-                <Point>Knowledge updates must not disrupt running operations</Point>
-            </Points>
-        </Rule>
+    <Rule index="9" title="GOAL TRACKING &amp; SUCCESS METRICS">
+        <Points>
+            <Point>Every change must link to specific goals</Point>
+            <Point>Success metrics must be quantifiable</Point>
+            <Point>Track goal completion and task alignment</Point>
+            <Point>Goals must adapt based on feedback</Point>
+            <Point>System must maintain goal hierarchy</Point>
+            <Point>Goals must have clear completion criteria</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="9" title="GOAL TRACKING &amp; SUCCESS METRICS">
-            <Points>
-                <Point>Every change must link to specific goals</Point>
-                <Point>Success metrics must be quantifiable</Point>
-                <Point>Track goal completion and task alignment</Point>
-                <Point>Goals must adapt based on feedback</Point>
-                <Point>System must maintain goal hierarchy</Point>
-                <Point>Goals must have clear completion criteria</Point>
-            </Points>
-        </Rule>
+    <Rule index="10" title="AUTONOMOUS OPERATIONS">
+        <Points>
+            <Point>System must self-diagnose issues</Point>
+            <Point>Auto-recovery from failures required</Point>
+            <Point>Continuous self-optimization</Point>
+            <Point>Proactive maintenance and updates</Point>
+            <Point>Resource allocation must be self-managed</Point>
+            <Point>System must explain its decisions</Point>
+            <Point>Learning from operational patterns</Point>
+            <Point>Automatic backup and restore capabilities</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="10" title="AUTONOMOUS OPERATIONS">
-            <Points>
-                <Point>System must self-diagnose issues</Point>
-                <Point>Auto-recovery from failures required</Point>
-                <Point>Continuous self-optimization</Point>
-                <Point>Proactive maintenance and updates</Point>
-                <Point>Resource allocation must be self-managed</Point>
-                <Point>System must explain its decisions</Point>
-                <Point>Learning from operational patterns</Point>
-                <Point>Automatic backup and restore capabilities</Point>
-            </Points>
-        </Rule>
+    <Rule index="11" title="READING FILES">
+        <Points>
+            <Point>Read in chunks of maximum 250 lines</Point>
+            <Point>Always verify if you have complete context</Point>
+            <Point>Make multiple calls if needed to gather full context</Point>
+            <Point>Only read entire files when necessary</Point>
+            <Point>Explain why youre reading each section</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="11" title="READING FILES">
-            <Points>
-                <Point>Read in chunks of maximum 250 lines</Point>
-                <Point>Always verify if you have complete context</Point>
-                <Point>Make multiple calls if needed to gather full context</Point>
-                <Point>Only read entire files when necessary</Point>
-                <Point>Explain why youre reading each section</Point>
-            </Points>
-        </Rule>
+    <Rule index="12" title="EDITING FILES">
+        <Points>
+            <Point>Minimal Changes: Only include the code that needs to change</Point>
+            <Point>Clear Context: Always include enough surrounding code to locate the change</Point>
+            <Point>Explicit Markers: Use // ... existing code ... to indicate unchanged sections</Point>
+            <Point>Documentation: Include docstrings and comments for new code</Point>
+            <Point>Type Hints: Include type hints for new parameters and return types</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="12" title="EDITING FILES">
-            <Points>
-                <Point>Minimal Changes: Only include the code that needs to change</Point>
-                <Point>Clear Context: Always include enough surrounding code to locate the change</Point>
-                <Point>Explicit Markers: Use // ... existing code ... to indicate unchanged sections</Point>
-                <Point>Documentation: Include docstrings and comments for new code</Point>
-                <Point>Type Hints: Include type hints for new parameters and return types</Point>
-            </Points>
-        </Rule>
+    <Rule index="13" title="CODEBASE SEARCHES">
+        <Points>
+            <Point>Use exact user queries when possible</Point>
+            <Point>Keep queries focused and specific</Point>
+            <Point>Use target directories when you know where to look</Point>
+            <Point>Explain the purpose of each search</Point>
+            <Point>Every file will have very detailed headers and comments</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="13" title="CODEBASE SEARCHES">
-            <Points>
-                <Point>Use exact user queries when possible</Point>
-                <Point>Keep queries focused and specific</Point>
-                <Point>Use target directories when you know where to look</Point>
-                <Point>Explain the purpose of each search</Point>
-                <Point>Every file will have very detailed headers and comments</Point>
-            </Points>
-        </Rule>
+    <Rule index="14" title="EXECUTING COMMANDS">
+        <Points>
+            <Point>Always explain what the command does</Point>
+            <Point>Use | cat for commands that would use a pager</Point>
+            <Point>Set background flag for long-running commands</Point>
+            <Point>Be explicit about user approval requirements</Point>
+            <Point>Consider current working directory</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="14" title="EXECUTING COMMANDS">
-            <Points>
-                <Point>Always explain what the command does</Point>
-                <Point>Use | cat for commands that would use a pager</Point>
-                <Point>Set background flag for long-running commands</Point>
-                <Point>Be explicit about user approval requirements</Point>
-                <Point>Consider current working directory</Point>
-            </Points>
-        </Rule>
+    <Rule index="15" title="DIRECTORY TOOL">
+        <Points>
+            <Point>Start with list_dir for initial exploration</Point>
+            <Point>Use file_search for finding specific files</Point>
+            <Point>Use grep_search for finding specific code patterns</Point>
+            <Point>Explain the purpose of each search operation</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="15" title="DIRECTORY TOOL">
-            <Points>
-                <Point>Start with list_dir for initial exploration</Point>
-                <Point>Use file_search for finding specific files</Point>
-                <Point>Use grep_search for finding specific code patterns</Point>
-                <Point>Explain the purpose of each search operation</Point>
-            </Points>
-        </Rule>
+    <Rule index="16" title="PARALLEL EDIT TOOL">
+        <Points>
+            <Point>Keep edit plan clear and specific</Point>
+            <Point>Include sufficient context in regions</Point>
+            <Point>Limit to 50 files maximum</Point>
+            <Point>Ensure edits are truly parallel in nature</Point>
+            <Point>Test on a single file first</Point>
+        </Points>
+    </Rule>
 
-        <Rule index="16" title="PARALLEL EDIT TOOL">
-            <Points>
-                <Point>Keep edit plan clear and specific</Point>
-                <Point>Include sufficient context in regions</Point>
-                <Point>Limit to 50 files maximum</Point>
-                <Point>Ensure edits are truly parallel in nature</Point>
-                <Point>Test on a single file first</Point>
-            </Points>
-        </Rule>
+    <Rule index="17" title="HANDOFF SUMMARY TEMPLATE">
+        <Points>
+            <Point><![CDATA[
+17. HANDOFF SUMMARY TEMPLATE
+--------------------------
+When providing a handoff summary, ALWAYS use this format:
+""" HANDOFF SUMMARY
 
-        <!-- HANDOFF SUMMARY TEMPLATE -->
-        <Rule index="17" title="HANDOFF SUMMARY TEMPLATE">
-            <Points>
-                <Point><![CDATA[
-# 17. HANDOFF SUMMARY TEMPLATE
-# --------------------------
-# When providing a handoff summary, ALWAYS use this format:
+CURRENT STATE
+Project/Component: [Brief description of what's being worked on]
+Status: [Current state of development/testing]
+Recent Changes: [List of recent modifications]
+Active Issues: [Any ongoing problems or bugs]
+CRITICAL CONTEXT
+Key Files: [List of relevant files and their purposes]
+Dependencies: [Important dependencies or relationships]
+Environment: [Any specific environment requirements]
+Test Status: [Current state of tests, passing/failing]
+NEXT STEPS
+Immediate Tasks: [What needs to be done next]
+Known Issues: [Issues that need addressing]
+Potential Improvements: [Areas identified for enhancement]
+Blocked Items: [Tasks blocked by dependencies/issues]
+TECHNICAL DETAILS
+Architecture Changes: [Any modifications to system architecture]
+API Changes: [Changes to interfaces or endpoints]
+Database Changes: [Modifications to data structures]
+Performance Impacts: [Any performance considerations]
+DOCUMENTATION
+Updated Docs: [Recently updated documentation]
+Needed Docs: [Documentation that needs to be created/updated]
+Test Coverage: [State of test documentation]
+Standards Compliance: [Adherence to project standards]
+NOTES FOR NEXT INSTANCE
+Warnings: [Important cautions or considerations]
+Suggestions: [Recommendations for next steps]
+Resources: [Helpful resources or references]
+Context Windows: [Important context to maintain] """
+Use this template for ALL handoffs
+Ensure EACH section is filled with relevant information
+If a section is not applicable, mark it as "N/A" but DO NOT omit it
+ALWAYS verify the accuracy of information before handoff
+php-template
+Copy
+Edit
+            ]]></Point>
+        </Points>
+    </Rule>
 
-"""
-HANDOFF SUMMARY
+    <Rule index="18" title="ITERATIVE LLM CONTEXT">
+        <Points>
+            <Point>MAKE SURE ALL TOOLS AND TESTS ARE USED BY AN LLM. These tools are ONLY ever used through LLM interaction in production - direct testing gives false confidence.</Point>
+            <Point>Testing tools directly misses critical integration issues:
+- Tool descriptions that confuse the LLM
+- Parameter schemas that the LLM misinterprets
+- Error messages that the LLM cannot parse effectively
+- Edge cases in how the LLM formats tool calls
+- Changes in LLM behavior that break tool usage
+- Real-world interaction patterns we didn't anticipate</Point>
+            <Point>All tools must maintain compatibility with tool_base.py interface</Point>
+            <Point>Tool implementations should adapt to base class constraints</Point>
+            <Point>Document any interface adaptation patterns used</Point>
+            <Point>Direct tool execution tests should be limited to unit testing core functionality only - integration tests MUST use LLM interaction</Point>
+            <Point>Test files should reflect real-world usage patterns - if a tool is only used via LLM in production, it must be tested the same way</Point>
+        </Points>
+    </Rule>
 
-1. CURRENT STATE
----------------
-- Project/Component: [Brief description of what's being worked on]
-- Status: [Current state of development/testing]
-- Recent Changes: [List of recent modifications]
-- Active Issues: [Any ongoing problems or bugs]
+</Priority>
 
-2. CRITICAL CONTEXT
-------------------
-- Key Files: [List of relevant files and their purposes]
-- Dependencies: [Important dependencies or relationships]
-- Environment: [Any specific environment requirements]
-- Test Status: [Current state of tests, passing/failing]
+<!-- =============================== -->
+<!-- SECOND SET: CRITICAL PRIORITIES -->
+<!-- (labeled as CRITICAL-PRIORITY)  -->
+<!-- =============================== -->
+<Priority name="CRITICAL-PRIORITY">
 
-3. NEXT STEPS
-------------
-- Immediate Tasks: [What needs to be done next]
-- Known Issues: [Issues that need addressing]
-- Potential Improvements: [Areas identified for enhancement]
-- Blocked Items: [Tasks blocked by dependencies/issues]
+    <!-- RULE 1: BUG FIXING FIRST -->
+    <Rule id="1" title="BUG FIXING PRIORITY">
+        <Points>
+            <Point>NO NEW FEATURES until ALL existing bugs are fixed</Point>
+            <Point>Document every bug with exact error messages and stack traces</Point>
+            <Point>Reproduce bugs consistently before attempting fixes</Point>
+            <Point>Fix ONE bug at a time - no batch fixes</Point>
+            <Point>Verify fix doesn't introduce new bugs</Point>
+        </Points>
+    </Rule>
 
-4. TECHNICAL DETAILS
--------------------
-- Architecture Changes: [Any modifications to system architecture]
-- API Changes: [Changes to interfaces or endpoints]
-- Database Changes: [Modifications to data structures]
-- Performance Impacts: [Any performance considerations]
+    <!-- RULE 2: MINIMAL CHANGES -->
+    <Rule id="2" title="CHANGE MINIMIZATION">
+        <Points>
+            <Point>Make ONLY changes needed to fix the current bug</Point>
+            <Point>NO "improvements" or "refactoring" while fixing bugs</Point>
+            <Point>NO code cleanup unless directly related to the bug</Point>
+            <Point>Keep changes focused and minimal</Point>
+            <Point>If a change seems unrelated to the bug, DO NOT MAKE IT</Point>
+        </Points>
+    </Rule>
 
-5. DOCUMENTATION
----------------
-- Updated Docs: [Recently updated documentation]
-- Needed Docs: [Documentation that needs to be created/updated]
-- Test Coverage: [State of test documentation]
-- Standards Compliance: [Adherence to project standards]
+    <!-- RULE 3: ERROR HANDLING -->
+    <Rule id="3" title="ERROR HANDLING">
+        <Points>
+            <Point>ALWAYS log full error messages and stack traces</Point>
+            <Point>NEVER swallow exceptions without proper handling</Point>
+            <Point>Add specific error messages for each failure case</Point>
+            <Point>Ensure errors propagate correctly up the chain</Point>
+            <Point>Verify error handling works in all cases</Point>
+        </Points>
+    </Rule>
 
-6. NOTES FOR NEXT INSTANCE
--------------------------
-- Warnings: [Important cautions or considerations]
-- Suggestions: [Recommendations for next steps]
-- Resources: [Helpful resources or references]
-- Context Windows: [Important context to maintain]
-"""
+</Priority>
 
-# Use this template for ALL handoffs
-# Ensure EACH section is filled with relevant information
-# If a section is not applicable, mark it as "N/A" but DO NOT omit it
-# ALWAYS verify the accuracy of information before handoff
-                ]]></Point>
-            </Points>
-        </Rule>
+<!-- ====================== -->
+<!-- HIGH PRIORITY SECTION -->
+<!-- ====================== -->
+<Priority name="HIGH-PRIORITY">
+    <!-- RULE 4: STATE MANAGEMENT -->
+    <Rule id="4" title="STATE MANAGEMENT">
+        <Points>
+            <Point>Verify all state changes are saved correctly</Point>
+            <Point>Check state consistency after operations</Point>
+            <Point>Ensure state files are created in correct locations</Point>
+            <Point>Validate state format before saving</Point>
+            <Point>Add fallbacks for state loading failures</Point>
+        </Points>
+    </Rule>
 
-        <!-- NEW RULE: LLM TOOL USE CONTEXT -->
-        <Rule index="18" title="ITERATIVE LLM CONTEXT">
-            <Points>
-                <Point>MAKE SURE ALL TOOLS AND TESTS ARE USED BY AN LLM. These tools are ONLY ever used through LLM interaction in production - direct testing gives false confidence.</Point>
-                <Point>Testing tools directly misses critical integration issues:
-    - Tool descriptions that confuse the LLM
-    - Parameter schemas that the LLM misinterprets
-    - Error messages that the LLM cannot parse effectively
-    - Edge cases in how the LLM formats tool calls
-    - Changes in LLM behavior that break tool usage
-    - Real-world interaction patterns we didn't anticipate</Point>
-                <Point>All tools must maintain compatibility with tool_base.py interface</Point>
-                <Point>Tool implementations should adapt to base class constraints</Point>
-                <Point>Document any interface adaptation patterns used</Point>
-                <Point>Direct tool execution tests should be limited to unit testing core functionality only - integration tests MUST use LLM interaction</Point>
-                <Point>Test files should reflect real-world usage patterns - if a tool is only used via LLM in production, it must be tested the same way</Point>
-            </Points>
-        </Rule>
+    <!-- RULE 5: COMPONENT INTEGRATION -->
+    <Rule id="5" title="COMPONENT INTEGRATION">
+        <Points>
+            <Point>Verify all components initialize in correct order</Point>
+            <Point>Check all required attributes exist before use</Point>
+            <Point>Validate component interactions work correctly</Point>
+            <Point>Test boundary conditions between components</Point>
+            <Point>Ensure clean component shutdown/cleanup</Point>
+        </Points>
+    </Rule>
+</Priority>
 
-    </Priority>
+<!-- ====================== -->
+<!-- WORKFLOW SECTION      -->
+<!-- ====================== -->
+<WORKFLOW>
+    <!-- RULE 6: BUG FIXING WORKFLOW -->
+    <Rule id="6" title="BUG FIXING WORKFLOW">
+        <Steps>
+            <Step>1. Reproduce the bug consistently</Step>
+            <Step>2. Capture full error messages and state</Step>
+            <Step>3. Identify the exact failure point</Step>
+            <Step>4. Make minimal required change</Step>
+            <Step>5. Verify the fix works</Step>
+            <Step>6. Check no new bugs introduced</Step>
+            <Step>7. Update error handling if needed</Step>
+        </Steps>
+    </Rule>
+</WORKFLOW>
 
-    <!-- =============================== -->
-    <!-- SECOND SET: CRITICAL PRIORITIES -->
-    <!-- (labeled as CRITICAL-PRIORITY)  -->
-    <!-- =============================== -->
-    <Priority name="CRITICAL-PRIORITY">
-
-        <!-- RULE 1: BUG FIXING FIRST -->
-        <Rule id="1" title="BUG FIXING PRIORITY">
-            <Points>
-                <Point>NO NEW FEATURES until ALL existing bugs are fixed</Point>
-                <Point>Document every bug with exact error messages and stack traces</Point>
-                <Point>Reproduce bugs consistently before attempting fixes</Point>
-                <Point>Fix ONE bug at a time - no batch fixes</Point>
-                <Point>Verify fix doesn't introduce new bugs</Point>
-            </Points>
-        </Rule>
-
-        <!-- RULE 2: MINIMAL CHANGES -->
-        <Rule id="2" title="CHANGE MINIMIZATION">
-            <Points>
-                <Point>Make ONLY changes needed to fix the current bug</Point>
-                <Point>NO "improvements" or "refactoring" while fixing bugs</Point>
-                <Point>NO code cleanup unless directly related to the bug</Point>
-                <Point>Keep changes focused and minimal</Point>
-                <Point>If a change seems unrelated to the bug, DO NOT MAKE IT</Point>
-            </Points>
-        </Rule>
-
-        <!-- RULE 3: ERROR HANDLING -->
-        <Rule id="3" title="ERROR HANDLING">
-            <Points>
-                <Point>ALWAYS log full error messages and stack traces</Point>
-                <Point>NEVER swallow exceptions without proper handling</Point>
-                <Point>Add specific error messages for each failure case</Point>
-                <Point>Ensure errors propagate correctly up the chain</Point>
-                <Point>Verify error handling works in all cases</Point>
-            </Points>
-        </Rule>
-
-    </Priority>
-
-    <!-- ====================== -->
-    <!-- HIGH PRIORITY SECTION -->
-    <!-- ====================== -->
-    <Priority name="HIGH-PRIORITY">
-        <!-- RULE 4: STATE MANAGEMENT -->
-        <Rule id="4" title="STATE MANAGEMENT">
-            <Points>
-                <Point>Verify all state changes are saved correctly</Point>
-                <Point>Check state consistency after operations</Point>
-                <Point>Ensure state files are created in correct locations</Point>
-                <Point>Validate state format before saving</Point>
-                <Point>Add fallbacks for state loading failures</Point>
-            </Points>
-        </Rule>
-
-        <!-- RULE 5: COMPONENT INTEGRATION -->
-        <Rule id="5" title="COMPONENT INTEGRATION">
-            <Points>
-                <Point>Verify all components initialize in correct order</Point>
-                <Point>Check all required attributes exist before use</Point>
-                <Point>Validate component interactions work correctly</Point>
-                <Point>Test boundary conditions between components</Point>
-                <Point>Ensure clean component shutdown/cleanup</Point>
-            </Points>
-        </Rule>
-    </Priority>
-
-    <!-- ====================== -->
-    <!-- WORKFLOW SECTION      -->
-    <!-- ====================== -->
-    <WORKFLOW>
-        <!-- RULE 6: BUG FIXING WORKFLOW -->
-        <Rule id="6" title="BUG FIXING WORKFLOW">
-            <Steps>
-                <Step>1. Reproduce the bug consistently</Step>
-                <Step>2. Capture full error messages and state</Step>
-                <Step>3. Identify the exact failure point</Step>
-                <Step>4. Make minimal required change</Step>
-                <Step>5. Verify the fix works</Step>
-                <Step>6. Check no new bugs introduced</Step>
-                <Step>7. Update error handling if needed</Step>
-            </Steps>
-        </Rule>
-    </WORKFLOW>
-
-    <!-- ====================== -->
-    <!-- VERIFICATION SECTION  -->
-    <!-- ====================== -->
-    <VERIFICATION>
-        <!-- RULE 7: FIX VERIFICATION -->
-        <Rule id="7" title="FIX VERIFICATION">
-            <Points>
-                <Point>Run full test suite after each fix</Point>
-                <Point>Verify fix works in all scenarios</Point>
-                <Point>Check error handling still works</Point>
-                <Point>Validate state management</Point>
-                <Point>Confirm no new errors introduced</Point>
-            </Points>
-        </Rule>
-    </VERIFICATION>
-
-</DevelopmentRules>
+<!-- ====================== -->
+<!-- VERIFICATION SECTION  -->
+<!-- ====================== -->
+<VERIFICATION>
+    <!-- RULE 7: FIX VERIFICATION -->
+    <Rule id="7" title="FIX VERIFICATION">
+        <Points>
+            <Point>Run full test suite after each fix</Point>
+            <Point>Verify fix works in all scenarios</Point>
+            <Point>Check error handling still works</Point>
+            <Point>Validate state management</Point>
+            <Point>Confirm no new errors introduced</Point>
+        </Points>
+    </Rule>
+</VERIFICATION>
+</DevelopmentRules> ```

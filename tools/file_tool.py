@@ -59,7 +59,7 @@ class FileTool(Tool):
                     "description": "Path to the file or directory to operate on"
                 },
                 "content": {
-                    "type": "string",
+                    "type": ["string", "null"],
                     "description": "Content to write or edit"
                 },
                 "start_line": {
@@ -86,6 +86,7 @@ class FileTool(Tool):
         """Execute the requested file operation."""
         operation = input.get("operation", "")
         path = input.get("path", "")
+        content = input.get("content")
         
         if not operation or not path:
             return {
@@ -99,7 +100,7 @@ class FileTool(Tool):
         
         try:
             if operation == "write":
-                content = input.get("content")
+
                 if not content:
                     return self._error("content is required for write operation")
                 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -135,7 +136,6 @@ class FileTool(Tool):
             elif operation == "edit_lines":
                 start = input.get("start_line")
                 end = input.get("end_line")
-                content = input.get("content")
                 if not all([start, end, content]):
                     return self._error("start_line, end_line and content required for edit_lines")
                 if not os.path.exists(path):
@@ -201,7 +201,6 @@ class FileTool(Tool):
                 return self._success(f"Successfully moved {path} to {dest}")
 
             elif operation == "append":
-                content = input.get("content")
                 if not content:
                     return self._error("content is required for append operation")
                 if not os.path.exists(path):
