@@ -106,6 +106,20 @@ INCORRECT USAGE:
      ```bash
      shell --command "ls -l"
      ```
+
+     ```json
+    {
+    "action": "List Directory Contents",
+    "description": "List the contents of the memory directory to understand what files and folders exist.",
+    "next_steps": [
+        {
+        "tool": "list_dir",
+        "arguments": "/media/justin/Samsung_4TB1/github/LLM_kit/memory",
+        "description": "Explore the current state of the memory directory."
+        }
+    ]
+    }
+    ```
     
 """
 

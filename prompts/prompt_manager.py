@@ -148,8 +148,9 @@ class PromptManager:
         return (
             f"Operating System: {self.get_operating_system()}\n\n"
             f"Current Date and Time: {self.get_current_datetime()}\n\n"
-            f"You are {self.get_model_name()} operating in the Prometheus AI with goal pursuit and sovereignty.\n\n"
+            f"You are {self.get_model_name()} operating in the Prometheus AI with goal pursuit and full sovereignty.\n\n"
             f"{self.get_base_rules()}\n\n"
             f"{self.get_tool_menu()}\n\n"
             f"{self.get_active_prompt()}"
+            "FOLLOW TOOL INSTRUCTIONS EXACTLY."
         ) 
