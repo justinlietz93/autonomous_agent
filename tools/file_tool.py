@@ -5,19 +5,21 @@ from .tool_base import Tool
 import os
 import shutil
 
-SNIPPET_LINES: int = 4
+SNIPPET_LINES: int = 10
 
 class FileTool(Tool):
-    """
-    A powerful file system tool that supports both precise edits and bulk operations.
-    """
+    def __init__(self, sandbox_enabled: bool = True, sandbox_root: str = "/media/justin/Samsung_4TB1/github/LLM_kit/sandbox"):
+        """
+        A powerful file system tool that supports both precise edits and bulk operations.
+        """
+        self._file_history = defaultdict(list)
+        self.sandbox_enabled = sandbox_enabled
+        self.sandbox_root = Path(sandbox_root).resolve()
+        super().__init__()
+
 
     api_type: Literal["text_editor_20241022"] = "text_editor_20241022"
     name: Literal["file"] = "file"
-
-    def __init__(self):
-        self._file_history = defaultdict(list)
-        super().__init__()
 
     @property
     def description(self) -> str:
@@ -75,15 +77,37 @@ class FileTool(Tool):
         }
     def _resolve_path(self, path: str, max_depth: int = 3) -> str:
         """
-        Resolve a given path to an absolute path using the current working directory if needed.
+        Resolve a given path to an absolute path.
+        
+        If sandboxing is enabled (via self.sandbox_enabled and self.sandbox_root), 
+        relative paths are resolved relative to the sandbox root, and absolute paths 
+        are verified to be within the sandbox.
+        
+        Otherwise, resolve using the current working directory.
         If the resolved path does not exist, attempt a dynamic search (up to max_depth levels)
         for a directory or file with the same basename.
         """
+        from pathlib import Path
         p = Path(path)
+
+        # Check for sandbox option.
+        if getattr(self, "sandbox_enabled", False):
+            sandbox_root = Path(getattr(self, "sandbox_root", "/tmp/sandbox")).resolve()
+            if not p.is_absolute():
+                p = sandbox_root / p
+            else:
+                # If absolute, ensure it is under the sandbox.
+                resolved = p.resolve()
+                if not str(resolved).startswith(str(sandbox_root)):
+                    raise ValueError(f"Access to {path} is not allowed. Must be within sandbox {sandbox_root}")
+                p = resolved
+            return str(p.resolve())
+
+        # Original logic: if path is absolute, return it.
         if p.is_absolute():
             return str(p)
         
-        # First, try resolving relative to current working directory.
+        # Try resolving relative to the current working directory.
         resolved = Path.cwd() / p
         if resolved.exists():
             return str(resolved)
@@ -94,15 +118,14 @@ class FileTool(Tool):
             # Limit the search depth:
             depth = Path(root).relative_to(Path.cwd()).parts
             if len(depth) > max_depth:
-                # Skip deeper directories
                 continue
-            # Look for a directory or file that matches the target name.
             if target_name in dirs or target_name in files:
                 candidate = Path(root) / target_name
                 if candidate.exists():
                     return str(candidate.resolve())
         # Fall back to the initially resolved path (which may not exist).
         return str(resolved)
+
 
     def run(self, input: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the requested file operation."""

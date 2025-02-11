@@ -84,70 +84,63 @@ class RealTimeToolParser:
         self.consecutive_failures = 0
 
     def feed(self, text_chunk: str) -> str:
-        """
-        Main entry point: feed the next chunk of text from the LLM.
-        Returns any normal text (i.e., not tool calls) to be passed on
-        to the user or conversation. If a tool call is encountered,
-        it is executed immediately in this method.
-
-        If a call fails validation or execution, raises ToolCallError with
-        a snippet of context. The caller can catch it and feed that error
-        back to the LLM to let the model self-correct.
-        """
         output_to_user = ""
-        output_to_user = "" # Initialize output_to_user to empty string at the very beginning
-        if self._parsing_json:
-            output_to_user = "" # Initialize to empty string when parsing JSON
-
-        # Update recent context (for debugging or error messages), trimmed to context_window
-        self._recent_context += text_chunk
-        if len(self._recent_context) > self.context_window:
-            self._recent_context = self._recent_context[-self.context_window:]
-
         if self._parsing_json:
             for i, ch in enumerate(text_chunk):
                 self._accumulate_json_char(ch)
                 if not self._parsing_json:
-                    # JSON completed - get and append tool result
-                    tool_result = self._handle_complete_tool_call()  # Get result
-                    output_to_user += tool_result  # Add result to output
-                    # We might have leftover text after the JSON ends
+                    tool_result = self._handle_complete_tool_call()
+                    output_to_user += tool_result
                     leftover = text_chunk[i + 1:]
                     output_to_user += self.feed(leftover)
                     return output_to_user
-            # If we reach here, still in JSON parse mode. Return whatever normal text preceded the marker.
             return output_to_user
 
-        # If we're NOT currently parsing JSON, search for the marker in (last_chars + current chunk)
+        # Update recent context (for debugging or error messages)
+        self._recent_context += text_chunk
+        if len(self._recent_context) > self.context_window:
+            self._recent_context = self._recent_context[-self.context_window:]
+
+        # Combine any leftover partial marker with the current chunk
         combined_text = self._last_chars + text_chunk
         idx = combined_text.find(self.marker)
+        
         if idx == -1:
-            safe_output = combined_text # Simply output the entire combined_text
-            start_idx = len(self._last_chars)
-            output_to_user += safe_output[start_idx:]
-            self._last_chars = "" # Reset last_chars since we've processed everything
+            # Check if the end of combined_text could be the start of a marker.
+            partial_marker_length = 0
+            for i in range(1, len(self.marker)):
+                if combined_text.endswith(self.marker[:i]):
+                    partial_marker_length = i
+                    break
+            # Output everything except the potential partial marker.
+            safe_output = combined_text[:-partial_marker_length] if partial_marker_length else combined_text
+            # Save the partial marker for the next chunk.
+            self._last_chars = combined_text[-partial_marker_length:] if partial_marker_length else ""
+            output_to_user += safe_output
             return output_to_user
 
-        # If marker is found
+        # If marker is found:
         marker_pos_in_combined = idx
         marker_pos_in_chunk = marker_pos_in_combined - len(self._last_chars)
-
-        # Add text before marker
         if marker_pos_in_chunk >= 0:
             output_to_user += text_chunk[:marker_pos_in_chunk]
 
-        # Start JSON parsing mode
+        # Reset the partial marker buffer as we've now found a complete marker.
+        self._last_chars = ""
+        
+        # Start JSON parsing mode.
         self._parsing_json = True
         self._json_buffer = ""
         self._brace_depth = 0
 
-        # Process remaining text
+        # Process remaining text after the marker.
         remaining = text_chunk[marker_pos_in_chunk + len(self.marker):]
         if remaining:
-            result = self.feed(remaining)  # Process rest of chunk
-            output_to_user += result  # Add any results from remaining text
+            result = self.feed(remaining)
+            output_to_user += result
 
         return output_to_user
+
 
     def _accumulate_json_char(self, ch: str):
         """

@@ -5,7 +5,7 @@ from typing import Generator
 class StreamSmoother:
     """Utility class to smooth streaming output from LLMs."""
 
-    def __init__(self, initial_delay: int = 8, zero_delay_queue_size: int = 32):
+    def __init__(self, initial_delay: int = 16, zero_delay_queue_size: int = 32):
         self.initial_delay = initial_delay
         self.zero_delay_queue_size = zero_delay_queue_size
 

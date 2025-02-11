@@ -12,6 +12,7 @@ from .doc_check_tool import DocCheckTool
 from .package_manager_tool import PackageManagerTool
 from .code_runner_tool import CodeRunnerTool
 from .computer_tool import ComputerTool
+from .api_tool import ApiCallTool
 
 class ToolRegistry:
     def __init__(self):
@@ -33,7 +34,8 @@ class ToolRegistry:
             DocCheckTool(),
             PackageManagerTool(),
             CodeRunnerTool(),
-            ComputerTool()
+            ComputerTool(),
+            ApiCallTool()
         ]
         for t in default_tools:
             self.register_tool(t)

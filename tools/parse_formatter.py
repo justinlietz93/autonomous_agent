@@ -135,7 +135,7 @@ class InlineCallParser:
     # Will catch function calls like file_write("path","""Multi line content """)
     FUNCTION_REGEX = re.compile(r'(^|[\s\.\,\;\:\!])(\w+)\s*\(',flags=re.DOTALL)
 
-    def __init__(self, tool_functions: Dict[str, Any], marker: str = "TOOL_CALL:"):
+    def __init__(self, tool_functions: Dict[str, Any], marker: str = "TOOL_CALL:", bypass_formatter: bool = False):
         """
         Args:
             tool_functions: a dict {tool_name: callable(**kwargs) -> str}
@@ -149,6 +149,7 @@ class InlineCallParser:
         self.buffer = ""
         # The marker for structured calls
         self.marker = marker
+        self.bypass_formatter = bypass_formatter
 
     def validate_input(self, tool_name: str, input_data: Dict[str, Any]) -> None:
         """Validate tool input against its schema."""
@@ -177,6 +178,9 @@ class InlineCallParser:
                     )
 
     def feed(self, text_chunk: str) -> str:
+        if self.bypass_formatter:
+            return self.rtp.feed(text_chunk)
+
         self.buffer += text_chunk
         output_text = ""
 
@@ -252,20 +256,27 @@ class InlineCallParser:
                 arg_start = inline_call_str.find('(') + 1
                 arg_str = inline_call_str[arg_start:-1]
 
-                # Try parsing and formatting the tool call.
                 try:
-                    parsed_args = self._parse_args(arg_str)
-                    tool_call_json = self._format_tool_call(func_name, parsed_args)
-                    tool_call_str = self.marker + json.dumps(tool_call_json)
-                    result = self.rtp.feed(tool_call_str)
-                except ValidationError as e:
-                    if func_name.lower() == "file_write":
+                    # If the argument string is extremely long, use the fallback parser directly.
+                    if len(arg_str) > 100:
                         try:
                             parsed_args = self._parse_file_write_args_tokenize(arg_str)
                         except Exception as e:
                             parsed_args = {"positional_args": []}
                     else:
+                        parsed_args = self._parse_args(arg_str)
+                except Exception as e:
+                    if func_name.lower() == "file_write":
+                        try:
+                            parsed_args = self._parse_file_write_args_tokenize(arg_str)
+                        except Exception as e2:
+                            parsed_args = {"positional_args": []}
+                    else:
                         raise e
+                tool_call_json = self._format_tool_call(func_name, parsed_args)
+                tool_call_str = self.marker + json.dumps(tool_call_json)
+                result = self.rtp.feed(tool_call_str)
+
 
                 # Replace the inline call text with the result.
                 new_output += self.buffer[:start_index] + result

@@ -173,7 +173,6 @@ from scratch.
                 final_text = inline_parser.feed(result["content"]["content"])
                 self.log("\n--- Your Previous Response ---")
                 self.log(final_text)
-                print("Sleeping for 3 seconds to avoid busy loop...")
                 time.sleep(3)
                 continue
 

@@ -121,7 +121,7 @@ class PromptManager:
     
     def get_tool_menu(self) -> str:
         """Get the tool menu."""
-        return self.get_prompt("TOOL_MENU") or ""
+        return self.get_prompt("JSON_TOOL_MENU") or ""
     
     def get_model_name(self) -> str:
         """Get the current model name."""
