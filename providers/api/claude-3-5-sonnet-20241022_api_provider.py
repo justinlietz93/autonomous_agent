@@ -130,7 +130,6 @@ class Claude35SonnetProvider(Tool):
                     yield {"response": typed_char}
 
         except Exception as e:
-            print(f"[DEBUG] Exception in .stream => {e}")
             yield {"response": f"Error: {str(e)}"}
 
     def _normalize_messages(self, raw_messages):

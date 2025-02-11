@@ -85,7 +85,7 @@ class AutonomousAgent:
 
         # 5) Session log file
         random_chars = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
-        prompt_name = self.prompt_manager.active_prompt.lower()
+        prompt_name = self.prompt_manager.active_prompt
         timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.session_id = f"{prompt_name}_{random_chars}"
         self.log_file = os.path.join("memory", "context_logs", f"context_{timestamp_str}_{self.session_id}.txt")
@@ -290,14 +290,18 @@ if __name__ == "__main__":
 
     # 4) Launch agent
     try:
+        if args.prompt and args.goal:
+            raise ValueError("Cannot specify both --prompt and --goal")
+        if not args.prompt and not args.goal:
+            raise ValueError("Must specify either --prompt or --goal")
+
         agent = AutonomousAgent(
             provider_name=args.provider, 
             single_mode=args.single,
-            goal_name=args.goal  # Pass goal name to agent
+            goal_name=args.goal
         )
         
-        # Only set prompt if no goal is specified
-        if args.prompt and not args.goal:
+        if args.prompt:
             agent.prompt_manager.set_active_prompt(args.prompt)
         
         agent.run()

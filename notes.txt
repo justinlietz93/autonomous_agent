@@ -1,2 +1,16 @@
 # Always use these flags
 /usr/bin/python3.12 -m venv venv --clear --copies
+
+Starting Docker container in detached mode...
+Container started with ID: 0e643f2ff3c2fa25b5517735e889cef5322553b8deb67ccaee56bbd9fd8b264d
+
+----------------------------------------------------------------------------
+Inside the container, your project root is located at /fake_root.
+You can delete or modify files there without affecting your real host.
+----------------------------------------------------------------------------
+
+To attach and work inside the container, run:
+  docker exec -it 0e643f2ff3c2fa25b5517735e889cef5322553b8deb67ccaee56bbd9fd8b264d bash
+
+Stop the container by running: docker stop 0e643f2ff3c2fa25b5517735e889cef5322553b8deb67ccaee56bbd9fd8b264d
+Remove it with:               docker rm 0e643f2ff3c2fa25b5517735e889cef5322553b8deb67ccaee56bbd9fd8b264d
