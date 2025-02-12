@@ -83,3 +83,6 @@ coverage.xml
 **/*_logs/
 
 .cursorrules
+
+# reverse engineering
+LLM_KIT/vllm

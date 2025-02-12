@@ -1,0 +1,18 @@
+memory_entryiduuidtimestampdatetimecontentstringembeddingsvector[float]tagsarray[string]priorityintegerversionintegermetadatasourcestringconfidencefloatlast_accesseddatetimeaccess_countinteger
+
+{
+    "memory_entry": {
+        "id": "uuid",
+        "timestamp": "datetime",
+        "content": "string",
+        "embeddings": "vector[float]",
+        "tags": "array[string]",
+        "priority": "integer",
+        "version": "integer",
+        "metadata": "string",
+        "source": "string",
+        "confidence": "float",
+        "last_accessed": "datetime",
+        "access_count": "integer"
+    }
+}

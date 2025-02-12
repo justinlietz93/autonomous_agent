@@ -7,7 +7,7 @@ FOLLOW THE EXACT TOOL CALL FORMATTING. INCORRECT CALLS WILL CAUSE SYSTEM FAILURE
 ------------------------------------------------------------
 FILE (file)
 ------------------------------------------------------------
-Use for file/directory operations: reading, writing, appending, editing, copying, moving, deleting.
+Use for file/directory operations: reading, writing, appending, editing, copying, moving, deleting. This also creates files if they don't exist.
 Example Calls:
 
 file_write("notes.txt", "Hello, world!")

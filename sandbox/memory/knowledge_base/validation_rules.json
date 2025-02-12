@@ -1,0 +1,18 @@
+contentmax_lengthrequiredtypestringtagsmax_itemsrequiredtypearraypriorityminmaxrequiredtypeinteger
+
+
+{
+    "content": {
+        "max_length": 1000,
+        "required_type": "string"
+    },
+    "tags": {
+        "max_items": 5,
+        "required_type": "array"
+    },
+    "priority": {
+        "min": 1,
+        "max": 10,
+        "required_type": "integer"
+    }
+}

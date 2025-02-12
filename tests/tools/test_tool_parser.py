@@ -70,7 +70,7 @@ async def mock_stream() -> str:
 
 async def test_parser():
     """Test the tool parser with streamed output"""
-    from tools.tool_parser import parse_tool_calls
+    from tools.archive.tool_parser import parse_tool_calls
     
     print("\n=== Tool Parser Tests ===")
     print("------------------------")

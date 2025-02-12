@@ -1,0 +1,62 @@
+{
+    "// INSTRUCTIONS": [
+      "This sequence is designed to plan, critique, and implement a system for building permanent memory.",
+      "Each prompt runs for a specific number of iterations and is designed to iteratively refine the design.",
+      "The sequence will:",
+      "1. Initiate a planning phase to define the permanent memory system's requirements, components, and challenges.",
+      "2. Lay out the project structure including directories and file responsibilities.",
+      "3. Critique and review the initial plan and project structure.",
+      "4. Update and refine the design based on self-critique.",
+      "5. Begin programming the permanent memory system following the refined plan.",
+      "6. Execute and test the system to verify functionality.",
+      "",
+      "Run with: python main_autonomous.py --goal permanent_memory"
+    ],
+    "name": "permanent_memory",
+    "description": "Plan, develop, and execute a system to build permanent memory for self-improvement",
+    "prompt_sequence": [
+      {
+        "prompt": "INITIAL_PLANNING",
+        "iterations": 3,
+        "description": "Plan out a comprehensive strategy for a permanent memory system.",
+        "goal": "Document detailed thoughts, design requirements, necessary components, and potential challenges for building a system that enables the LLM to have permanent memory."
+      },
+      {
+        "prompt": "PROJECT_STRUCTURE",
+        "iterations": 1,
+        "description": "Lay out the project structure for the permanent memory system.",
+        "goal": "Define the directory layout, files, and module responsibilities needed to implement the permanent memory system."
+      },
+      {
+        "prompt": "SELF_REVIEW",
+        "iterations": 1,
+        "description": "Review and critique the initial plan and project structure.",
+        "goal": "Critically analyze the design notes and project structure, identifying potential issues, missing components, or improvements."
+      },
+      {
+        "prompt": "UPDATE_PLAN",
+        "iterations": 1,
+        "description": "Refine and update the plan based on the self-review.",
+        "goal": "Incorporate the feedback from the critique to make necessary changes or updates to the design and structure documentation."
+      },
+      {
+        "prompt": "IMPLEMENTATION",
+        "iterations": 1,
+        "description": "Begin programming the permanent memory system.",
+        "goal": "Write code that implements the core functionality of the permanent memory system according to the refined plan."
+      },
+      {
+        "prompt": "EXECUTION",
+        "iterations": 1,
+        "description": "Execute and test the permanent memory system.",
+        "goal": "Run the implemented system, validate that the permanent memory functionality works as intended, and document the outcomes."
+      },
+      {
+        "prompt": "FINAL_REFLECTION",
+        "iterations": 1,
+        "description": "Review the permanent memory system.",
+        "goal": "Review the permanent memory system, identify any issues, and make necessary improvements."
+      }
+    ]
+  }
+  

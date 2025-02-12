@@ -1,21 +1,15 @@
-# real_time_tool_parser.py
-
 #########################################################
-
 # WARNING: THIS FILE IS OFF LIMITS. IT IS COMPLETED AND 
 # SHOULD NOT BE MODIFIED. DO NOT MODIFY WITHOUT EXPLICIT
 # PERMISSION FROM JUSTIN.
-
 # IF YOU FIND ISSUES DOCUMENT THEM IN docs/tool_pipeline_issues.md
-
-#########################################################   
+#########################################################
 
 import json
 import inspect
-import typing
 from datetime import datetime
 import re
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Tuple
 
 class ToolCallError(Exception):
     """
@@ -27,24 +21,17 @@ class ToolCallError(Exception):
         self.message = message
         self.context = context
 
-
 class RealTimeToolParser:
     """
     A streaming parser that:
-    1. Watches incoming text chunks for the special marker "TOOL_CALL:".
-    2. Collects JSON after this marker (possibly split across chunk boundaries).
-    3. Validates the JSON structure & function signature.
-    4. Executes the matching tool (function) immediately.
-    5. Returns normal text output (non-tool text) as it arrives.
-    6. Feeds errors back to the LLM if the call fails.
-
-    Features:
-    - Rolling buffer so "TOOL_CALL:" can be detected even if split across chunks.
-    - Deferred JSON capture that starts at the first '{' after the marker.
-    - Brace-depth tracking to find the complete JSON block.
-    - Basic type-checking using Python function type hints.
-    - A history log of all calls/results for potential debugging or persistence.
-    - Optionally streams results back into the conversation context.
+      1. Watches incoming text chunks for the special marker "TOOL_CALL:".
+      2. Collects JSON after this marker (possibly split across chunk boundaries).
+      3. Validates the JSON structure & function signature.
+      4. Executes the matching tool (function) immediately.
+      5. Returns normal text output (non-tool text) as it arrives.
+      6. Feeds errors back to the LLM if the call fails.
+      
+    This iterative implementation avoids deep recursion by using an internal buffer.
     """
 
     def __init__(
@@ -64,17 +51,10 @@ class RealTimeToolParser:
         self.context_window = context_window
         self._debug = False
 
-        # Rolling buffer for partial marker detection
-        self._last_chars = ""
+        # Persistent internal buffer for accumulating text
+        self._buffer = ""
 
-        # Buffers/states for parsing incremental JSON
-        self._json_buffer = ""
-        self._parsing_json = False
-        self._brace_depth = 0
-        self._in_string = False
-        self._escape_next = False
-
-        # For capturing recent text (for error context)
+        # Recent context for error reporting
         self._recent_context = ""
 
         # History of calls (and results) for debugging or advanced agent usage
@@ -84,158 +64,128 @@ class RealTimeToolParser:
         self.consecutive_failures = 0
 
     def feed(self, text_chunk: str) -> str:
+        """
+        Append a new text chunk to the internal buffer and process it iteratively.
+        Returns the text output with tool calls replaced by their results.
+        """
         output_to_user = ""
-        if self._parsing_json:
-            for i, ch in enumerate(text_chunk):
-                self._accumulate_json_char(ch)
-                if not self._parsing_json:
-                    tool_result = self._handle_complete_tool_call()
-                    output_to_user += tool_result
-                    leftover = text_chunk[i + 1:]
-                    output_to_user += self.feed(leftover)
-                    return output_to_user
-            return output_to_user
+        self._buffer += text_chunk
 
-        # Update recent context (for debugging or error messages)
+        # Update recent context (for error messages)
         self._recent_context += text_chunk
         if len(self._recent_context) > self.context_window:
             self._recent_context = self._recent_context[-self.context_window:]
 
-        # Combine any leftover partial marker with the current chunk
-        combined_text = self._last_chars + text_chunk
-        idx = combined_text.find(self.marker)
-        
-        if idx == -1:
-            # Check if the end of combined_text could be the start of a marker.
-            partial_marker_length = 0
-            for i in range(1, len(self.marker)):
-                if combined_text.endswith(self.marker[:i]):
-                    partial_marker_length = i
+        while True:
+            # Look for the marker in the current buffer.
+            marker_idx = self._buffer.find(self.marker)
+            if marker_idx == -1:
+                # No marker found.
+                # Check if the end of the buffer might be a partial marker.
+                partial_marker_length = 0
+                for i in range(1, len(self.marker)):
+                    if self._buffer.endswith(self.marker[:i]):
+                        partial_marker_length = i
+                        break
+                safe_output = self._buffer[:-partial_marker_length] if partial_marker_length else self._buffer
+                output_to_user += safe_output
+                self._buffer = self._buffer[-partial_marker_length:] if partial_marker_length else ""
+                break
+            else:
+                # Output text before the marker.
+                output_to_user += self._buffer[:marker_idx]
+                # Remove the text up to (and including) the marker.
+                self._buffer = self._buffer[marker_idx + len(self.marker):]
+
+                # Attempt to extract a complete JSON block from the buffer.
+                json_block, remaining = self._extract_complete_json(self._buffer)
+                if json_block is None:
+                    # Incomplete JSON block—wait for more text.
                     break
-            # Output everything except the potential partial marker.
-            safe_output = combined_text[:-partial_marker_length] if partial_marker_length else combined_text
-            # Save the partial marker for the next chunk.
-            self._last_chars = combined_text[-partial_marker_length:] if partial_marker_length else ""
-            output_to_user += safe_output
-            return output_to_user
-
-        # If marker is found:
-        marker_pos_in_combined = idx
-        marker_pos_in_chunk = marker_pos_in_combined - len(self._last_chars)
-        if marker_pos_in_chunk >= 0:
-            output_to_user += text_chunk[:marker_pos_in_chunk]
-
-        # Reset the partial marker buffer as we've now found a complete marker.
-        self._last_chars = ""
-        
-        # Start JSON parsing mode.
-        self._parsing_json = True
-        self._json_buffer = ""
-        self._brace_depth = 0
-
-        # Process remaining text after the marker.
-        remaining = text_chunk[marker_pos_in_chunk + len(self.marker):]
-        if remaining:
-            result = self.feed(remaining)
-            output_to_user += result
+                else:
+                    self._buffer = remaining
+                    try:
+                        tool_call = json.loads(json_block)
+                        tool_result = self._execute_tool_call(tool_call)
+                        output_to_user += tool_result
+                    except Exception as e:
+                        output_to_user += f"[Error processing tool call: {e}]"
+                    # Continue processing any remaining text in the buffer.
 
         return output_to_user
 
-
-    def _accumulate_json_char(self, ch: str):
+    def _extract_complete_json(self, buffer: str) -> Tuple[Optional[str], str]:
         """
-        Track a single character as part of an in-progress JSON object.
-        Uses brace depth and string-literal state to decide when the JSON is complete.
+        Attempt to extract a complete JSON block from the beginning of the buffer.
+        Returns a tuple: (json_block, remaining_buffer). If no complete block is found,
+        returns (None, buffer).
         """
-        self._json_buffer += ch
+        start_idx = buffer.find('{')
+        if start_idx == -1:
+            return None, buffer
 
-        if self._in_string:
-            if self._escape_next:
-                self._escape_next = False
-            else:
-                if ch == '\\':
-                    self._escape_next = True
-                elif ch == '"':
-                    self._in_string = False
-            return
+        in_string = False
+        escape_next = False
+        brace_count = 0
+        json_end_idx = None
 
-        if ch == '"':
-            self._in_string = True
-            self._escape_next = False
-            return
-        elif ch == '{':
-            self._brace_depth += 1
-        elif ch == '}':
-            if self._brace_depth > 0:
-                self._brace_depth -= 1
-            if self._brace_depth == 0:
-                # JSON block completed
-                self._parsing_json = False
+        for i in range(start_idx, len(buffer)):
+            ch = buffer[i]
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == '\\':
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if ch == '{':
+                    brace_count += 1
+                elif ch == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_end_idx = i
+                        break
 
-    def _handle_complete_tool_call(self):
+        if json_end_idx is not None:
+            json_block = buffer[start_idx:json_end_idx+1]
+            remaining = buffer[json_end_idx+1:]
+            return json_block, remaining
+        else:
+            return None, buffer
+
+    def _execute_tool_call(self, tool_call: dict) -> str:
         """
-        We have a complete JSON block in self._json_buffer. 
-        Validate, call the appropriate tool, log or raise errors.
+        Validate and execute the tool call based on the parsed JSON.
+        Returns the output of the tool as a string.
         """
-        full_json = self._json_buffer
-        self._json_buffer = ""
+        if not isinstance(tool_call, dict):
+            raise ToolCallError("Tool call JSON must be a top-level object/dict.", context=self._recent_context)
 
-        # Also clear out the rolling marker buffer, since we've used it
-        self._last_chars = ""
+        if "tool" not in tool_call or "input_schema" not in tool_call:
+            raise ToolCallError("Invalid tool call: must have 'tool' and 'input_schema' fields.", context=self._recent_context)
 
-        try:
-            call_data = json.loads(full_json)
-        except json.JSONDecodeError as e:
-            raise ToolCallError(
-                f"JSON parse error: {e}",
-                context=self._recent_context
-            )
-
-        if not isinstance(call_data, dict):
-            raise ToolCallError(
-                "Tool call JSON must be a top-level object/dict.",
-                context=self._recent_context
-            )
-
-        # Check required top-level fields
-        if "tool" not in call_data or "input_schema" not in call_data:
-            raise ToolCallError(
-                "Invalid tool call: must have 'tool' and 'input_schema' fields.",
-                context=self._recent_context
-            )
-
-        tool_name = call_data["tool"]
-        inputs = call_data["input_schema"]
+        tool_name = tool_call["tool"]
+        inputs = tool_call["input_schema"]
 
         if tool_name not in self.tools:
-            raise ToolCallError(
-                f"Unrecognized tool '{tool_name}'",
-                context=self._recent_context
-            )
+            raise ToolCallError(f"Unrecognized tool '{tool_name}'", context=self._recent_context)
 
         if not isinstance(inputs, dict):
-            raise ToolCallError(
-                "input_schema must be an object/dict",
-                context=self._recent_context
-            )
+            raise ToolCallError("input_schema must be an object/dict", context=self._recent_context)
 
         tool_object = self.tools[tool_name]
-
-        # Signature check on the run method
         sig = inspect.signature(tool_object.run)
         try:
-            sig.bind(input=inputs)  # Validate against run method's signature
+            sig.bind(input=inputs)  # Validate against the run method's signature.
         except TypeError as te:
-            raise ToolCallError(
-                f"Tool call argument mismatch: {te}",
-                context=self._recent_context
-            )
+            raise ToolCallError(f"Tool call argument mismatch: {te}", context=self._recent_context)
 
-        # Execute the tool's run method
         try:
             result = tool_object.run(input=inputs)
-            
-            # Log success
+            # Log the successful tool call.
             self.history.append({
                 "time": datetime.now().isoformat(),
                 "tool": tool_name,
@@ -244,108 +194,78 @@ class RealTimeToolParser:
                 "status": "successfully called tool"
             })
 
-            # Extract string result
+            # Return the result as a string.
             if isinstance(result, dict):
                 return f"\n{result.get('content', '')}\n"
-            return str(result)  # Convert any other result to string
-
+            return str(result)
         except Exception as ex:
             raise ToolCallError(f"Tool '{tool_name}' execution failed: {ex}", context=self._recent_context)
 
-    def get_history(self):
+    def get_history(self) -> List[Dict[str, Any]]:
         """Retrieve log of tool calls (for debugging or storing in a DB)."""
-        
-        print(f"DEBUG: self.history = {self.history}")
         return list(self.history)
 
     def reset(self):
-        """
-        Reset parser state between conversations or whenever needed.
-        """
-        self._last_chars = ""
-        self._json_buffer = ""
-        self._parsing_json = False
-        self._brace_depth = 0
-        self._in_string = False
-        self._escape_next = False
+        """Reset parser state between conversations or whenever needed."""
+        self._buffer = ""
         self._recent_context = ""
         self.history.clear()
         self.consecutive_failures = 0
 
     def debug_mode(self, enabled: bool = True) -> None:
-        """Enable/disable debug logging"""
+        """Enable/disable debug logging."""
         self._debug = enabled
 
 def parse_tool_calls(text: str) -> List[Dict[str, Any]]:
-    """Parse tool calls from streamed text output."""
-    # Static buffer to accumulate text across calls
+    """
+    Parse tool calls from streamed text output.
+    This utility function accumulates text in a static buffer and returns any complete tool call JSON blocks.
+    """
     if not hasattr(parse_tool_calls, '_buffer'):
         parse_tool_calls._buffer = ''
     
-    # Add new text to buffer
     parse_tool_calls._buffer += text
-    
-    print(f"DEBUG: Current buffer: {repr(parse_tool_calls._buffer)}")  # Debug line
-    
-    # Look for complete tool calls
     tool_calls = []
-    
     marker = 'TOOL_CALL:'
     
     while marker in parse_tool_calls._buffer:
         try:
             start = parse_tool_calls._buffer.index(marker)
             json_start = parse_tool_calls._buffer.index('{', start)
-            
-            print(f"DEBUG: Found tool call at {start}, JSON starts at {json_start}")  # Debug line
-            print(f"DEBUG: JSON content: {repr(parse_tool_calls._buffer[json_start:])}")  # Debug line
-            
-            # Track nested braces to find complete JSON
             brace_count = 0
             in_string = False
             escape_next = False
-            
+            json_end = None
             for i, char in enumerate(parse_tool_calls._buffer[json_start:], json_start):
                 if escape_next:
                     escape_next = False
                     continue
-                    
                 if char == '\\':
                     escape_next = True
                     continue
-                    
                 if char == '"' and not escape_next:
                     in_string = not in_string
                     continue
-                    
                 if not in_string:
                     if char == '{':
                         brace_count += 1
                     elif char == '}':
                         brace_count -= 1
                         if brace_count == 0:
-                            # Found complete JSON
-                            json_str = parse_tool_calls._buffer[json_start:i+1]
-                            try:
-                                tool_call = json.loads(json_str)
-                                if "tool" in tool_call and "input_schema" in tool_call:
-                                    tool_calls.append(tool_call)
-                            except json.JSONDecodeError:
-                                pass  # Skip invalid JSON
-                            
-                            # Remove processed part from buffer
-                            parse_tool_calls._buffer = parse_tool_calls._buffer[i+1:]
+                            json_end = i
                             break
-            
-            if brace_count > 0:
-                # Incomplete JSON, keep buffering
+            if json_end is not None:
+                json_str = parse_tool_calls._buffer[json_start:json_end+1]
+                try:
+                    tool_call = json.loads(json_str)
+                    if "tool" in tool_call and "input_schema" in tool_call:
+                        tool_calls.append(tool_call)
+                except json.JSONDecodeError:
+                    pass  # Skip invalid JSON.
+                parse_tool_calls._buffer = parse_tool_calls._buffer[json_end+1:]
+            else:
                 break
-                
-            # Remove processed part up to json_start if no valid JSON found
-            parse_tool_calls._buffer = parse_tool_calls._buffer[json_start:]
-            
         except ValueError:
-            # No complete tool call found
             break
             
     return tool_calls

@@ -1,0 +1,11 @@
+version: 0.1
+components:
+  orchestrator:
+    enabled: true
+    max_agents: 8
+  memory:
+    type: vector
+    backend: pinecone
+  learning:
+    real_time: true
+    batch_interval: 3600

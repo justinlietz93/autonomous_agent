@@ -15,7 +15,7 @@ except Exception as e:
     logger.error(f"Failed to import InlineCallParser: {e}")
 
 try:
-    from tools.tool_parser import RealTimeToolParser
+    from tools.archive.tool_parser import RealTimeToolParser
     logger.info("Successfully imported RealTimeToolParser")
 except Exception as e:
     logger.error(f"Failed to import RealTimeToolParser: {e}")

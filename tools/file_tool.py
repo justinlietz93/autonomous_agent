@@ -1,6 +1,8 @@
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Literal, get_args
+
+from pydantic import ValidationError
 from .tool_base import Tool
 import os
 import shutil
@@ -144,9 +146,10 @@ class FileTool(Tool):
         path = self._resolve_path(path)
         
         try:
-            if operation == "write":
+            if operation == "write" or operation == "file_create":
                 if not content:
-                    return self._error("content is required for write operation")
+                    raise ValidationError("content is required for write operation")
+                    # return self._error("content is required for write operation")
                 abs_path = self._resolve_path(path)
                 try:
                     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
@@ -208,7 +211,7 @@ class FileTool(Tool):
                     f.writelines(lines)
                 return self._success(f"Successfully edited lines {start}-{end} in {path}")
                 
-            elif operation == "delete":
+            elif operation == "delete" or operation == "file_delete":
                 if not os.path.exists(path):
                     return self._error(f"Path not found: {path}")
                 if os.path.isdir(path):

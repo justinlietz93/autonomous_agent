@@ -16,7 +16,8 @@ import json
 from typing import Any, Dict, List, Union, Optional
 from dataclasses import dataclass
 
-from tools.tool_parser import RealTimeToolParser, ToolCallError
+from tools.archive.tool_parser import RealTimeToolParser, ToolCallError
+from tools.utils.tool_logger import ToolLogger
 
 @dataclass
 class ToolSchema:
@@ -133,7 +134,11 @@ class InlineCallParser:
     }
 
     # Will catch function calls like file_write("path","""Multi line content """)
-    FUNCTION_REGEX = re.compile(r'(^|[\s\.\,\;\:\!])(\w+)\s*\(',flags=re.DOTALL)
+    FUNCTION_REGEX = re.compile(
+        r'(?<!\bdef\s)(?<!\bclass\s)(^|[\s\.\,\;\:\!])(\w+)\s*\(',
+        flags=re.DOTALL
+    )
+    
 
     def __init__(self, tool_functions: Dict[str, Any], marker: str = "TOOL_CALL:", bypass_formatter: bool = False):
         """
@@ -184,16 +189,33 @@ class InlineCallParser:
         self.buffer += text_chunk
         output_text = ""
 
+        # Safeguard: Prevent infinite outer loop iterations.
+        outer_iterations = 0
+        max_outer_iterations = 1000
+
+
         # Continue processing until the buffer no longer yields any new tool call markers.
         while True:
+            outer_iterations += 1
+            if outer_iterations > max_outer_iterations:
+                ToolLogger.warning("Max outer iterations reached; aborting inline call parsing.")
+                break
             new_output = ""
+            inner_iterations = 0
+            max_inner_iterations = 10000
             while True:
+                inner_iterations += 1
+                if inner_iterations > max_inner_iterations:
+                    ToolLogger.warning("Max inner iterations reached; aborting inline call parsing.")
+                    break
+
                 match = self.FUNCTION_REGEX.search(self.buffer)
                 if not match:
                     break
 
                 func_name = match.group(2)
-                if func_name not in self.TOOL_NAME_MAP:
+                # Allow unmapped tools like "memory_entry" to pass through.
+                if func_name not in self.TOOL_NAME_MAP and func_name != "memory_entry":
                     new_output += self.buffer[:match.end()]
                     self.buffer = self.buffer[match.end():]
                     continue
@@ -206,37 +228,46 @@ class InlineCallParser:
                 quote_delim = ""
                 escape = False
 
+                # Safeguard: Prevent infinite inner loop iterations until the closing parenthesis is found
+                iteration = 0
+                max_iterations = 10000
+
                 # Process until the closing parenthesis is found.
                 while i < len(self.buffer) and paren_level > 0:
+                    iteration += 1
+                    if iteration > max_iterations:
+                        ToolLogger.warning("Max iterations reached in parenthesis scanning; aborting inline call parsing.")
+                        break  # break out of the inner loop to wait for more text
+  
                     ch = self.buffer[i]
-                    if escape:
+                    if escape: # handle escape characters
                         escape = False
                         i += 1
                         continue
-                    if not in_quote:
-                        if self.buffer[i:i+3] in ('"""', "'''"):
+                    if not in_quote: # outside any string
+                        if self.buffer[i:i+3] in ('"""', "'''"): # start of a triple quote
                             in_quote = True
                             triple_quote = True
                             quote_delim = self.buffer[i:i+3]
                             i += 3
                             continue
-                        elif ch in ('"', "'"):
+                        elif ch in ('"', "'"): # start of a single quote
                             in_quote = True
                             triple_quote = False
                             quote_delim = ch
                             i += 1
                             continue
-                        else:
+                        else: # count parens when not inside a quote
                             if ch == '(':
                                 paren_level += 1
                             elif ch == ')':
                                 paren_level -= 1
                             i += 1
-                    else:
+                    else: # inside a quote / string
                         if ch == '\\':
                             escape = True
                             i += 1
-                        else:
+                        else: # look for the end of the quote / string
                             if triple_quote and self.buffer[i:i+3] == quote_delim:
                                 in_quote = False
                                 triple_quote = False
@@ -248,6 +279,7 @@ class InlineCallParser:
                                 i += 1
 
                 # If closing parenthesis wasn't found, break out to wait for more text.
+                # This means a tool call is not complete yet.
                 if paren_level != 0:
                     break
 
@@ -256,25 +288,28 @@ class InlineCallParser:
                 arg_start = inline_call_str.find('(') + 1
                 arg_str = inline_call_str[arg_start:-1]
 
-                try:
-                    # If the argument string is extremely long, use the fallback parser directly.
-                    if len(arg_str) > 100:
-                        try:
-                            parsed_args = self._parse_file_write_args_tokenize(arg_str)
-                        except Exception as e:
-                            parsed_args = {"positional_args": []}
-                    else:
+                # Determine whether to use the fallback parser based on tool type and argument length.
+                if func_name.lower() == "file_write" and len(arg_str) > 100:
+                    try:
+                        parsed_args = self._parse_file_write_args_tokenize(arg_str)
+                    except Exception:
+                        parsed_args = {"positional_args": []}
+                else:
+                    try:
                         parsed_args = self._parse_args(arg_str)
-                except Exception as e:
-                    if func_name.lower() == "file_write":
-                        try:
-                            parsed_args = self._parse_file_write_args_tokenize(arg_str)
-                        except Exception as e2:
-                            parsed_args = {"positional_args": []}
-                    else:
-                        raise e
+                    except Exception as e:
+                        # For file_write calls, attempt fallback if the standard parser fails.
+                        if func_name.lower() == "file_write":
+                            try:
+                                parsed_args = self._parse_file_write_args_tokenize(arg_str)
+                            except Exception:
+                                parsed_args = {"positional_args": []}
+                        else:
+                            raise e
+
                 tool_call_json = self._format_tool_call(func_name, parsed_args)
-                tool_call_str = self.marker + json.dumps(tool_call_json)
+                # Format JSON with indentation for clarity.
+                tool_call_str = self.marker + json.dumps(tool_call_json, indent=4)
                 result = self.rtp.feed(tool_call_str)
 
 
@@ -298,7 +333,7 @@ class InlineCallParser:
     def _parse_args(self, args_str: str) -> Dict[str, Any]:
         import ast
         try:
-            # Wrap the arguments in a dummy function call.
+            # Wrap the arguments in a dummy function call to build an AST.
             call_str = f"f({args_str})"
             node = ast.parse(call_str, mode='eval')
             if not (isinstance(node, ast.Expression) and isinstance(node.body, ast.Call)):
@@ -308,7 +343,11 @@ class InlineCallParser:
             kwargs = {keyword.arg: ast.literal_eval(keyword.value) for keyword in call_node.keywords}
             return {"positional_args": positional_args, **kwargs}
         except Exception as e:
-            raise ValidationError("Failed to parse arguments", {"error": str(e)})
+            # As a fallback, try to parse as JSON.
+            try:
+                return json.loads(args_str)
+            except Exception:
+                raise ValidationError("Failed to parse arguments", {"error": str(e)})
 
     def _format_tool_call(self, func_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         mapped_tool = self.TOOL_NAME_MAP.get(func_name, func_name)
@@ -364,9 +403,13 @@ class InlineCallParser:
                 if operation == "write" and len(pos_args) > 1:
                     input_schema["value"] = pos_args[1]
             else:
-                input_schema = {k: v for k, v in args.items() if k != "positional_args"}
-                if pos_args:
-                    input_schema["args"] = pos_args
+                # Default: if a single positional argument is a dict, use it.
+                if len(pos_args) == 1 and isinstance(pos_args[0], dict) and len(args) == 1:
+                    input_schema = pos_args[0]
+                else:
+                    input_schema = {k: v for k, v in args.items() if k != "positional_args"}
+                    if pos_args:
+                        input_schema["args"] = pos_args
             self.validate_input(mapped_tool, input_schema)
             tool_call["input_schema"] = input_schema
             return tool_call

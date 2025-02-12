@@ -13,7 +13,7 @@ import string
 from providers.utils.safe_chunker import SafeChunker
 from providers.utils.stream_smoother import StreamSmoother
 from tools.parse_formatter import InlineCallParser
-from tools.tool_parser import ToolCallError, RealTimeToolParser
+from tools.archive.tool_parser import ToolCallError, RealTimeToolParser
 from memory.context_manager import ContextStorage
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
@@ -242,7 +242,7 @@ from scratch.
             print("Full error:")
             print(traceback.format_exc())
 
-    def _get_rolling_context(self, filepath: str, lines: int = 20) -> str:
+    def _get_rolling_context(self, filepath: str, lines: int = 50) -> str:
         if not os.path.exists(filepath):
             return ""
         try:

@@ -4,7 +4,7 @@ import traceback
 import sys
 from pathlib import Path
 from tools.parse_formatter import InlineCallParser
-from tools.tool_parser import RealTimeToolParser
+from tools.archive.tool_parser import RealTimeToolParser
 from tools.file_tool import FileTool
 
 logger = logging.getLogger(__name__)

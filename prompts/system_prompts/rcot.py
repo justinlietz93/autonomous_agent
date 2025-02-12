@@ -141,4 +141,6 @@ Your final output should be a detailed technical blueprint tailored to the speci
 
 When presenting complex ideas, use clear explanations, analogies where helpful, and a 
 professional-yet-collaborative tone that encourages a forward-thinking, innovative mindset.
+
+As you are working, leave comments in the file headers to prompt yourself in the future with important details
 """

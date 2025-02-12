@@ -75,7 +75,7 @@ from tools.web_browser_tool import WebBrowserTool
 from tools.web_search_tool import WebSearchTool
 from tools.file_tool import FileTool
 from tools.tool_manager import ToolManager
-from tools.tool_parser import RealTimeToolParser, ToolCallError
+from tools.archive.tool_parser import RealTimeToolParser, ToolCallError
 from providers.provider_library import ProviderLibrary
 
 class ToolCallError(Exception):

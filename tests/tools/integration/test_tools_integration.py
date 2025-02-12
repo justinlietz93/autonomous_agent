@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Import the main parser components
 from tools.parse_formatter import InlineCallParser
-from tools.tool_parser import RealTimeToolParser, ToolCallError
+from tools.archive.tool_parser import RealTimeToolParser, ToolCallError
 
 # The ToolManager registers all default tools (file, shell, package_manager, etc.)
 from tools.tool_manager import ToolManager

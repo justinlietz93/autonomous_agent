@@ -68,9 +68,6 @@ class GoalManager:
 
         current_step = self.current_sequence[self.current_index]
         self.current_iterations += 1
-        print(f"Step {self.current_index + 1}/{len(self.current_sequence)}: "
-              f"Iteration {self.current_iterations}/{current_step.get('iterations', '∞')}")
-
         # Check if we should move to next prompt
         should_advance = False
 
@@ -78,14 +75,12 @@ class GoalManager:
         if "iterations" in current_step:
             if self.current_iterations >= current_step["iterations"]:
                 should_advance = True
-                print(f"Completed iterations for step {self.current_index + 1}")
 
         # Check condition if specified
         if "condition" in current_step:
             condition_met = self._check_condition(current_step["condition"], session_log)
             if condition_met:
                 should_advance = True
-                print(f"Met condition for step {self.current_index + 1}")
 
         if should_advance:
             self.current_index += 1
@@ -96,8 +91,6 @@ class GoalManager:
                 print("Goal sequence complete!")
                 self._reset_state()
                 return True
-            else:
-                print(f"Moving to step {self.current_index + 1}")
 
         self._save_state()
         return False
