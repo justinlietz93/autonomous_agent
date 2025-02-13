@@ -1,11 +1,8 @@
-# real_time_tool_parser.py
+# tool_parser.py
 
 #########################################################
 
-# WARNING: THIS FILE IS OFF LIMITS. IT IS COMPLETED AND 
-# SHOULD NOT BE MODIFIED. DO NOT MODIFY WITHOUT EXPLICIT
-# PERMISSION FROM JUSTIN.
-
+# WARNING: 
 # IF YOU FIND ISSUES DOCUMENT THEM IN docs/tool_pipeline_issues.md
 
 #########################################################   

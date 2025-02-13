@@ -37,7 +37,7 @@ Note: If your code only defines functions/classes without executing actions (e.g
 
 Parameters:
 – files: List of files (each with "path" and "content")
-– main_file: Entry point file (e.g., "main.py")
+– main_file: Entry point file (e.g., "autonomous_main.py")
 – language: "python", "typescript", "go", or "rust"
 – Optional: args, env, timeout, build_args
 

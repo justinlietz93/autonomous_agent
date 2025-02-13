@@ -1,0 +1,193 @@
+Below is an outline of how you can design a clean, flexible system where any LLM can produce tool calls in any supported syntax or “dialect,” and the system automatically converts them into a standardized JSON structure for validation and execution. This approach avoids re‐implementing parsing logic for each model and fosters a robust, maintainable design.
+
+1. Core Principles
+Model-Agnostic:
+Each LLM is simply a text stream source. It might output inline calls, JSON blocks, shell-like commands, or some other format—but the parser infrastructure treats them all the same.
+
+Dedicated Dialect Parsers:
+Each dialect has a specialized parser (state machine or grammar-based), responsible for recognizing its syntax and producing a standardized internal representation.
+
+Unified Tool Call Structure:
+Regardless of which dialect or LLM produced the text, once a parser recognizes a call, it converts it into a canonical JSON payload—something like:
+
+json
+Copy
+{
+  "tool": "file",
+  "input_schema": {
+    "operation": "write",
+    "path": "notes.txt",
+    "content": "Hello, world!"
+  }
+}
+All downstream logic (e.g., validation, execution) depends on this format.
+
+Incremental, Chunked Parsing:
+Because LLM outputs can arrive in partial chunks, each parser must maintain an internal state so it can handle incomplete data. It only returns a fully parsed call (or an error) once it has enough text to confirm a valid structure.
+
+Extensibility:
+Adding a new LLM or a new syntax/dialect shouldn’t require changes in your core tool call execution. You just drop in a new parser module (or enhance an existing one) that knows how to parse that dialect.
+
+2. High‐Level Data Flow
+LLM Output:
+Any LLM (e.g., “claude,” “qwen,” “deepseek,” etc.) streams text to the chunk accumulator.
+
+Router:
+
+Knows which model is currently active or has produced the text chunk.
+Based on configuration, the router decides which parser(s) to engage. For instance, if “qwen” is known to produce JSON blocks, the router might prioritize the JSON dialect parser. If “claude” is known to produce function-like calls, it might try the inline function parser.
+If you want each LLM to be able to produce any dialect, you can either:
+Attempt to parse with multiple dialects in parallel and see which one succeeds.
+Use heuristics or “markers” to detect which dialect is used (e.g., do we see TOOL_CALL: { ... } or file_write(...)?).
+Dialect Parsers (one or more):
+
+A parser receives the text buffer and attempts to parse out any complete tool calls.
+If it parses a valid call, it emits a canonical JSON structure.
+If the input is incomplete, it keeps waiting for more text (maintaining the partial parse state).
+Unified JSON Tool Calls:
+
+The parser(s) pass the standardized tool calls to a validator or directly to a tool executor.
+The system logs or displays errors if the JSON is invalid or references unknown tools.
+Tool Execution:
+
+The final step is to pass the valid JSON calls to your tool_base and run them.
+The execution results (e.g., success/failure, returned data) feed back into the pipeline, ultimately reaching the user.
+3. Maintaining Parser State Across Chunks
+One of the biggest challenges with streaming output is partial data. Here’s how to handle it cleanly:
+
+Shared Buffer or Parser-Specific Buffer:
+
+Each dialect parser can maintain its own buffer/state.
+When new text arrives, the router dispatches it to the relevant parser.
+That parser updates its internal state and tries to parse complete calls.
+Incremental Parsing:
+
+Many parsing libraries (e.g., Lark, ANTLR) have a “streaming” or “incremental” mode, or you can write a custom state machine that keeps track of parentheses, braces, quotes, etc.
+For JSON blocks, you can track bracket depth. For shell-like commands, you can track whitespace and quoted strings. For function-like calls, you handle parentheses and string literals.
+Partial vs. Complete:
+
+If the parser can parse an entire call, it returns a structured call object.
+If it’s in the middle of a call, it signals “need more data.”
+The router then waits for more chunks before calling parse again.
+4. Validation and Tool Registry
+To prevent accidental or malformed calls:
+
+Registry of Tools:
+
+Each recognized tool is listed in a registry along with its required/optional fields, input types, and so on.
+E.g., a “file” tool requires an “operation” field with valid values like “write,” “read,” etc.
+Schema Validation:
+
+After generating the standardized JSON, run it against the schema (like the input_schema in your current design).
+If something is missing or has the wrong type, raise a validation error before executing.
+Prevention of Accidental Calls:
+
+Only recognized tool names are permitted.
+Unexpected or malicious inputs (like exec("rm -rf /")) can be blocked at parse time, or flagged in a separate “safety check” layer.
+5. Example Implementation Sketch
+Here’s a very high‐level pseudo‐code approach to get the idea across:
+
+python
+Copy
+class Router:
+    def __init__(self, parser_map):
+        # parser_map: { model_name: [list_of_parsers] }
+        # or a single set of parsers all LLMs might use
+        self.parser_map = parser_map
+        self.buffers = {}  # maintain separate buffer for each parser if needed
+
+    def feed(self, model_name, text_chunk):
+        # Decide which parser(s) to use
+        # e.g., if each model has a known parser set:
+        parsers = self.parser_map.get(model_name, [])
+        
+        # Alternatively, try all parsers in some priority order
+        calls = []
+        for parser in parsers:
+            new_calls = parser.parse_incremental(text_chunk)
+            # parse_incremental might return a list of parsed calls 
+            # plus leftover text that is incomplete
+            calls.extend(new_calls)
+        
+        # Return a list of fully parsed calls
+        return calls
+
+class JSONDialectParser:
+    def __init__(self):
+        self.buffer = ""
+        self.depth = 0
+        # ... more state for partial JSON parse
+
+    def parse_incremental(self, text_chunk):
+        self.buffer += text_chunk
+        calls = []
+        
+        # Try extracting valid JSON blocks up to balanced braces
+        while True:
+            call, leftover = self._extract_one_json_call(self.buffer)
+            if not call:
+                break
+            calls.append(call)
+            self.buffer = leftover
+        
+        return calls
+
+    def _extract_one_json_call(self, text):
+        # e.g., search for "TOOL_CALL:" prefix, then parse balanced braces
+        # if incomplete, return None
+        # if complete, return (json_call, leftover_text)
+        pass
+
+# Similarly define BashDialectParser, FunctionCallParser, etc.
+Each parser uses its own approach to chunking, but they all produce the same final structure:
+
+python
+Copy
+{
+  "tool": "file",
+  "input_schema": {
+    "operation": "write",
+    "path": "notes.txt",
+    "content": "Hello, world!"
+  }
+}
+Which can then be validated and executed with no further concern about the original LLM or syntax format.
+
+6. Benefits of This Approach
+Clean Separation of Concerns
+
+LLM output → Router → Dialect Parsers → Unified JSON → Tool Execution
+Each layer has a specific role.
+Easier to Add New Features
+
+Introducing a new tool is just adding it to the registry with a schema.
+Introducing a new syntax is just adding a new parser.
+More Robust
+
+Partial/incremental input is handled gracefully by each parser’s state machine.
+No single giant regex tries to handle all possible call formats.
+Flexible for Any LLM
+
+You’re never rewriting the entire pipeline for each new model—just, at most, changing or adding parser logic if a new model demands a novel syntax.
+7. Next Steps
+Define or Choose a Parsing Strategy
+
+If the function-call style or bash style can be complicated (nested quotes, multiline strings), consider using a library like Lark or Parsimonious to build a grammar.
+Implement One Parser at a Time
+
+Start with your existing function-call dialect. Convert that to an incremental parse system.
+Then add JSON. Then add Bash-like calls, etc.
+Develop Thorough Tests
+
+Test partial chunks, weird edge cases (nested parentheses, triple quotes, etc.), and schema mismatches.
+Refine the Router
+
+Decide if you want a direct model-to-parser mapping or a universal approach that tries multiple parsers.
+Possibly add heuristics or a direct “dialect hint” in the LLM prompt or output.
+Add Validation and Execution
+
+Integrate the resulting JSON calls with your existing tool_base classes and schemas.
+Wrapping Up
+By implementing a router + multiple incremental dialect parsers + a unified JSON schema + a robust validation layer, you’ll have a clean, scalable system. You can add or remove LLMs, tools, or syntax variants without re-engineering the entire pipeline. This design also mitigates the chance of accidental or malformed tool calls, since every parsed call is subject to a final schema check before being executed.
+
+Feel free to ask for additional details about any part of this approach—whether it’s grammar-writing, parser design, or hooking up to your existing tool base classes. Good luck building a flexible, model‐agnostic tool call system!

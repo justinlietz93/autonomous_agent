@@ -82,35 +82,28 @@ class Claude35SonnetProvider(Tool):
     def stream(self, params: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
         """Streaming approach with debug prints, chunker, parser, typed-lag."""
         try:
-            # print("[DEBUG] Entering .stream() in Claude35SonnetProvider")
 
             messages = self._normalize_messages(params["messages"])
             max_tokens = params.get("max_tokens", 4096)
-            # print(f"[DEBUG] messages => {messages}")
 
             with self.client.messages.stream(
                 model=Config.CLAUDE_MODEL,
                 max_tokens=max_tokens,
                 messages=messages
             ) as stream:
-                # print("[DEBUG] Opened stream with Anthropic.")
                 for chunk in stream:
-                    # print(f"[DEBUG] RAW CHUNK => {chunk}")
 
                     if chunk.type == "content_block_delta":
                         text = chunk.delta.text
-                        # print(f"[DEBUG] chunk.delta.text => {repr(text)}")
 
                         if text:
                             # Pass partial text into the chunker
                             for safe_chunk in self.chunker.process_incoming_text(text):
-                                # print(f"[DEBUG] safe_chunk => {repr(safe_chunk)}")
 
                                 # Optionally parse
                                 parsed_chunk = safe_chunk
                                 if self.parser:
                                     parsed_chunk = self.parser.feed(safe_chunk)
-                                    # print(f"[DEBUG] parsed_chunk => {repr(parsed_chunk)}")
 
                                 # typed-lag
                                 for typed_char in self.smoother.smooth_stream(parsed_chunk):
@@ -120,11 +113,9 @@ class Claude35SonnetProvider(Tool):
             # After the stream ends, flush leftover
             leftover = self.chunker.flush_remaining()
             if leftover:
-                # print(f"[DEBUG] leftover => {repr(leftover)}")
                 leftover_parsed = leftover
                 if self.parser:
                     leftover_parsed = self.parser.feed(leftover)
-                    # print(f"[DEBUG] leftover_parsed => {repr(leftover_parsed)}")
 
                 for typed_char in self.smoother.smooth_stream(leftover_parsed):
                     yield {"response": typed_char}

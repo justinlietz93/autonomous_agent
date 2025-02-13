@@ -1,0 +1,155 @@
+Below is an outline of how you might design a more robust, “legitimate” parser that can handle multiple tool-call dialects, inline calls with tricky content, multi-line strings, and partial/chunked input. The overarching idea is to replace the current ad-hoc regex/substring scanning with a formal or semi-formal parsing strategy—either by implementing a custom state machine or using a parsing library (e.g., Lark, parsimonious, textX, or ANTLR4). The parser would maintain an incremental parse state across chunks, so it can recognize when a tool call starts, handle incomplete data, and finalize parsing once enough text has arrived.
+
+1. Multiple Dialects and Syntax Toggles
+You mentioned wanting to support at least three styles of tool calls:
+
+Bash-like
+bash
+Copy
+file read --path "memory_best_practices.md"
+JSON-like
+json
+Copy
+TOOL_CALL: {
+  "tool": "file",
+  "input_schema": {
+    "operation": "write",
+    "path": "notes.txt",
+    "content": "Hello, world!"
+  }
+}
+Function-call (current)
+python
+Copy
+file_write("notes.txt", "Hello, world!")
+A flexible parser design might:
+
+Detect a “dialect prefix” or specific markers that signal which dialect to parse. For example:
+TOOL_CALL: at the start of a line might trigger JSON parsing.
+<tool_name> <subcommand> with double-dash flags (--flag value) might trigger a Bash-like parser.
+A function-like pattern <tool>_xyz(...) might trigger the function-call parser.
+Or, unify all styles into a single grammar with optional syntax rules. This can get complicated, but is doable.
+By toggling parsers (or parser sub-rules), you can keep each dialect’s logic clean and separate, yet ultimately produce the same internal representation (e.g., a dictionary describing which tool to run and the input arguments).
+
+2. Incremental Parsing and Handling Partial Chunks
+Streaming Concerns
+When text arrives in chunks (e.g., from a live user or a streaming channel), you need to handle situations where a tool call is split across multiple chunks. This means you can’t reliably parse the text only once per chunk; you must:
+
+Accumulate each new chunk into a buffer.
+Feed that buffer into a parser that can:
+Consume as many complete tool calls as possible.
+Leave any partial/incomplete call unconsumed until more text arrives.
+Maintaining Parser State
+A robust solution is to maintain a parser instance that has an internal state (or parse “cursor”). When new text arrives:
+
+The parser continues from wherever it left off (meaning it’s aware of any unfinished string literals, unmatched parentheses/brackets, etc.).
+If it reaches a valid end of a tool call, it returns that call as a structured object (or JSON).
+If the parser runs out of complete data but is still “inside” a call, it waits for more text rather than raising an error.
+Detecting Start/End of Calls
+For JSON blocks, you might detect a TOOL_CALL: token, then parse forward until you see a balanced set of braces { ... }.
+For Bash-like calls, you might detect a known tool name or a line that starts with file, shell, etc. Then parse until the line ends or until you’ve collected all arguments (recognizing quoted strings).
+For function-call syntax, you look for <identifier>(...), handle nested parentheses, triple quotes, etc.
+Example Strategy with a Grammar
+Using a parsing library, you define rules. For example (in a simplified EBNF-ish style):
+
+makefile
+Copy
+inline_call = 
+    function_call
+    | json_dialect
+    | bash_dialect
+    ;
+
+function_call = identifier '(' argument_list ')';
+
+argument_list = (string_literal | numeric_literal | ... ) ( ',' (string_literal | numeric_literal | ...) )*;
+
+json_dialect = 'TOOL_CALL:' ws? json_object;
+
+bash_dialect = identifier ws command_args;
+...
+Your parser library can handle partial data by returning a “need more input” signal if it cannot yet parse a complete structure.
+
+3. Handling Tricky Cases: Nested Parentheses, Escapes, and Weird Content
+Example:
+python
+Copy
+file_write("test.txt", ")file_write("test","hello")")
+The second argument to file_write actually contains )file_write("test","hello") as a string. A naive parser might stop at the ) inside that string and assume the call is closed prematurely.
+A robust grammar-based parser or a well-structured state machine would track when it’s inside a string literal and ignore punctuation until the corresponding string delimiter is reached.
+Multi-line strings (""" ... """) can also be integrated into the grammar. A good library-based approach is typically more reliable here than rolling your own.
+Cross-Chunk String Literals
+If the user typed """Hello, \n chunk 1\n... and the next chunk has the rest of the string chunk 2\n""", your parser must hold onto the partial string, recognize it hasn’t closed yet, and wait for the """.
+4. Producing a Unified Output (JSON Schema)
+No matter which dialect you parse, you’ll eventually produce a standardized Python dictionary like:
+
+python
+Copy
+{
+  "tool": "<tool_name>",
+  "input_schema": {
+    "operation": "write",
+    "path": "notes.txt",
+    "content": "Hello, world!"
+  }
+}
+That dictionary can then be turned into JSON and passed along to your execution pipeline (RealTimeToolParser or equivalent). This step is analogous to what _format_tool_call(...) does today, but you’d have a more reliable “front-end” parser feeding it well-structured data.
+
+5. Practical Tips and Implementation Approaches
+Dedicated Parser Libraries
+
+Lark (Python): Great for defining EBNF grammars, can do both LALR(1) and Earley parsing (Earley can handle ambiguous grammars well).
+Parsimonious: A PEG parser library that’s smaller but still flexible.
+ANTLR4: Heavier but extremely powerful. You define a .g4 grammar; it can parse languages quite effectively.
+Custom State Machine
+
+Write your own streaming state machine that scans character by character, maintaining:
+Current dialect detection (are we in JSON, Bash, or function-call mode?).
+Parentheses/braces/brackets nesting level.
+Inside-string vs. outside-string flags (including triple quotes).
+This can work, but is typically more error-prone than a dedicated grammar library.
+Incremental / Partial Parsing
+
+If you want truly incremental parsing (where you can stop mid-string and resume seamlessly on the next chunk), look for libraries that support partial or interactive parsing.
+Alternatively, store incomplete text in a buffer, keep re-invoking the parser until it either fails on incomplete data or returns a complete parse. Then hold onto leftover text for the next round.
+Error Recovery
+
+Decide what happens if a dialect is partially or incorrectly formed. You might:
+Abort that tool call and treat it as plain text.
+Raise a parse error and ask the user/AI to correct the syntax.
+Attempt “best-effort” parse and ignore invalid tokens.
+Multiple Dialects, One Grammar or Multiple Grammars
+
+If the dialects are drastically different, you can maintain separate grammars (one for JSON calls, one for Bash-like calls, one for function-calls).
+If the user text might contain any dialect interleaved, you can do a top-level rule that tries each dialect in turn until one matches.
+6. Next Steps and How to Move Forward
+Prototype a Grammar
+
+Pick a library (e.g., Lark or Parsimonious).
+Write a grammar for the function-call syntax as a first test.
+Implement incremental feeding of text. On each chunk, run the parser on buffer + new_chunk, see if you can parse a complete call. If you get a partial parse, store the leftover text for the next chunk.
+Add JSON Dialect
+
+Extend the grammar or write a second parser that looks for TOOL_CALL: { ... }.
+Integrate it with your incremental pipeline so that if you see TOOL_CALL: plus a {, you parse JSON until the matching }.
+Add Bash-like Dialect
+
+Add rules for something like <identifier> <subcommand> --flag "quoted value".
+Convert the parsed results into the same dictionary structure.
+Testing and Hardening
+
+Create test cases with partial inputs, multiline strings, nested parentheses, etc.
+Make sure each test case either yields a correct parse or indicates partial/incomplete data in a predictable way.
+Refine for Production
+
+Build in robust error handling or fallback behaviors.
+Possibly add logging or a debug mode to help figure out why certain text fails to parse.
+Wrapping Up
+By replacing regex-based scanning with a true parsing approach—one that supports multiple syntax “dialects” and handles partial input—your tool calls will be parsed more reliably. You’ll be able to unify everything into a standard JSON structure (or Python dict) and feed it into your downstream execution pipeline. That approach should resolve the chronic “failed to parse arguments” problems and weird edge cases like ")file_write("test","hello")" being interpreted incorrectly.
+
+Let me know if you need more details on:
+
+Choosing a specific parser library.
+Writing a partial/incremental parser in Python.
+Structuring your code so it can handle three or more dialects gracefully.
+I’m happy to dive deeper on any of these points or help craft a prototype grammar to get you started!

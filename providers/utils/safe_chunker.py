@@ -10,7 +10,7 @@ class SafeChunker:
     Also supports time-based partial flush if no boundary is found.
     """
 
-    def __init__(self, flush_interval: float = 1.5):
+    def __init__(self, flush_interval: float = 0.2):
         """
         :param flush_interval: number of seconds to wait before
                                forcibly flushing partial buffer
@@ -23,7 +23,6 @@ class SafeChunker:
         self.last_flush_time = time.time()
 
     def process_incoming_text(self, new_text: str):
-        # print(f"[DEBUG] SafeChunker.process_incoming_text => new_text = {repr(new_text)}")
         self.partial_buffer += new_text
 
         while True:
@@ -35,14 +34,12 @@ class SafeChunker:
                 if self.partial_buffer and time_since_last_flush >= self.flush_interval:
                     # forcibly flush
                     forced_chunk = self._flush_all()
-                    # print(f"[DEBUG] SafeChunker => TIME-BASED FLUSH => {repr(forced_chunk)}")
                     yield forced_chunk
                 break
             else:
                 # Found a boundary
                 safe_chunk = self.partial_buffer[:boundary_idx + 1]
                 self.partial_buffer = self.partial_buffer[boundary_idx + 1:]
-                # print(f"[DEBUG] SafeChunker => NORMAL BOUNDARY CHUNK => {repr(safe_chunk)}")
                 yield self._flush_chunk(safe_chunk)
 
     def find_smart_boundary(self, buffer: str) -> int:

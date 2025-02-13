@@ -8,7 +8,7 @@ import shutil
 SNIPPET_LINES: int = 10
 
 class FileTool(Tool):
-    def __init__(self, sandbox_enabled: bool = True, sandbox_root: str = "/media/justin/Samsung_4TB1/github/LLM_kit/sandbox"):
+    def __init__(self, sandbox_enabled: bool = False, sandbox_root: str = "/media/justin/Samsung_4TB1/github/LLM_kit/sandbox"):
         """
         A powerful file system tool that supports both precise edits and bulk operations.
         """

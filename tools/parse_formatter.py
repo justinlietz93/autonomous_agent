@@ -53,6 +53,9 @@ class InlineCallParser:
         "documentation_check": "documentation_check",
         "file_read": "file",
         "file_write": "file",
+        "write_file": "file",
+        "create_file": "file",
+        "write_file": "file",
         "file_delete": "file",
         "list_dir": "file",
         "web_search": "web_search",
@@ -183,9 +186,14 @@ class InlineCallParser:
 
         self.buffer += text_chunk
         output_text = ""
+        previous_buffer = None
 
-        # Continue processing until the buffer no longer yields any new tool call markers.
+        # Process until no progress is made.
         while True:
+            if self.buffer == previous_buffer:
+                break
+            previous_buffer = self.buffer
+
             new_output = ""
             while True:
                 match = self.FUNCTION_REGEX.search(self.buffer)
@@ -206,7 +214,7 @@ class InlineCallParser:
                 quote_delim = ""
                 escape = False
 
-                # Process until the closing parenthesis is found.
+                # Parse until the matching closing parenthesis.
                 while i < len(self.buffer) and paren_level > 0:
                     ch = self.buffer[i]
                     if escape:
@@ -247,21 +255,20 @@ class InlineCallParser:
                             else:
                                 i += 1
 
-                # If closing parenthesis wasn't found, break out to wait for more text.
+                # If no closing parenthesis, wait for more text.
                 if paren_level != 0:
                     break
 
-                # Extract the inline call's argument string.
+                # Extract the argument string.
                 inline_call_str = self.buffer[start_index:i]
                 arg_start = inline_call_str.find('(') + 1
                 arg_str = inline_call_str[arg_start:-1]
 
                 try:
-                    # If the argument string is extremely long, use the fallback parser directly.
                     if len(arg_str) > 100:
                         try:
                             parsed_args = self._parse_file_write_args_tokenize(arg_str)
-                        except Exception as e:
+                        except Exception:
                             parsed_args = {"positional_args": []}
                     else:
                         parsed_args = self._parse_args(arg_str)
@@ -269,25 +276,25 @@ class InlineCallParser:
                     if func_name.lower() == "file_write":
                         try:
                             parsed_args = self._parse_file_write_args_tokenize(arg_str)
-                        except Exception as e2:
+                        except Exception:
                             parsed_args = {"positional_args": []}
                     else:
                         raise e
+
                 tool_call_json = self._format_tool_call(func_name, parsed_args)
                 tool_call_str = self.marker + json.dumps(tool_call_json)
                 result = self.rtp.feed(tool_call_str)
 
-
-                # Replace the inline call text with the result.
                 new_output += self.buffer[:start_index] + result
                 self.buffer = self.buffer[i:]
-            
+
             new_output += self.buffer
             self.buffer = ""
-            # If the new output still contains a tool call marker, reassign it to buffer and process again.
+
+            # Remove any lingering marker from the output.
             if self.marker in new_output:
+                new_output = new_output.replace(self.marker, "")
                 self.buffer = new_output
-                output_text = ""
                 continue
             else:
                 output_text = new_output
@@ -298,7 +305,11 @@ class InlineCallParser:
     def _parse_args(self, args_str: str) -> Dict[str, Any]:
         import ast
         try:
-            # Wrap the arguments in a dummy function call.
+            # Increase threshold to handle bigger inline arguments
+            if len(args_str) > 10000:
+                return self._parse_file_write_args_tokenize(args_str)
+
+            # The original code remains unchanged below
             call_str = f"f({args_str})"
             node = ast.parse(call_str, mode='eval')
             if not (isinstance(node, ast.Expression) and isinstance(node.body, ast.Call)):
@@ -382,6 +393,7 @@ class InlineCallParser:
         It extracts all string tokens from the argument string.
         Assumes the first string token is the file path and all subsequent tokens,
         concatenated together, form the file content.
+        If only one string token is found, the file content defaults to an empty string.
         """
         import tokenize
         import io
@@ -392,16 +404,20 @@ class InlineCallParser:
         for token_type, token_string, _, _, _ in tokens:
             if token_type == tokenize.STRING:
                 try:
-                    # Convert the token to its literal value.
                     value = ast.literal_eval(token_string)
                     string_literals.append(value)
                 except Exception:
                     pass
 
-        if len(string_literals) < 2:
+        if not string_literals:
             raise ValidationError("Failed to parse file_write arguments using tokenize", {"args_str": args_str})
-
+        
+        # If only one token is found, assume it is the file path and set content to empty.
+        if len(string_literals) == 1:
+            file_path = string_literals[0]
+            file_content = ""
+            return {"positional_args": [file_path, file_content]}
+        
         file_path = string_literals[0]
-        # Join all remaining tokens to form the file content.
         file_content = "".join(string_literals[1:])
         return {"positional_args": [file_path, file_content]}

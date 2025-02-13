@@ -115,7 +115,7 @@ class AutonomousAgent:
                 print("\nEnd of single response.")
                 return
             except Exception as e:
-                print(f"Error: {e}")
+                # print(f"Error: {e}")
                 return
 
         # Otherwise do an indefinite autonomous loop
@@ -182,11 +182,9 @@ from scratch.
                 try:
                     # First convert function calls to TOOL_CALL format
                     formatted_text = inline_parser.feed(chunk_text)
-                    # print("\nDEBUG: After inline parser:", formatted_text)
                     
                     # Then execute any tool calls and get final text
                     user_text = tool_parser.feed(formatted_text)
-                    # print("DEBUG: After tool parser:", user_text)
                     
                     final_text += user_text
                     sys.stdout.write(user_text)
@@ -212,7 +210,7 @@ from scratch.
             self.log(final_text)
 
             # Sleep a bit to avoid a tight loop
-            print("Sleeping for 3 seconds to avoid busy loop...")
+            print("\nPausing for 3 seconds to avoid busy loop...")
             time.sleep(3)
             last_response = final_text
 
@@ -242,13 +240,12 @@ from scratch.
             print("Full error:")
             print(traceback.format_exc())
 
-    def _get_rolling_context(self, filepath: str, lines: int = 20) -> str:
+    def _get_rolling_context(self, filepath: str, lines: int = 100) -> str:
         if not os.path.exists(filepath):
             return ""
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 all_lines = f.readlines()
-                # print(f"DEBUG: Read {len(all_lines)} lines from log file")
                 snippet = all_lines[-lines:] if len(all_lines) > lines else all_lines
                 return "".join(snippet).strip()
         except Exception as e:
