@@ -9,6 +9,7 @@ pyautogui
 
 # API compatibility
 openai
+anthropic
 
 # Testing
 pytest-asyncio

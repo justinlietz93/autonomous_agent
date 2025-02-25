@@ -1,4 +1,4 @@
-PROMT = """
+PROMPT = """
 TOOL MENU
 !! WARNING: CRITICAL NOTICE !!
 FOLLOW THE EXACT TOOL CALL FORMATTING. INCORRECT CALLS WILL CAUSE SYSTEM FAILURE.
@@ -122,7 +122,7 @@ Parameters:
 ------------------------------------------------------------
 WEB BROWSER (web_browser)
 ------------------------------------------------------------
-Fetches and parses a web page’s content; can extract text, links, or the title.
+Fetches and parses a web page's content; can extract text, links, or the title.
 
 Example JSON:
 TOOL_CALL: {
@@ -206,7 +206,7 @@ Parameters:
 - requirements_file: (Optional) Path to a requirements.txt file for bulk installs.
 
 What It Does:
-Executes pip commands based on the provided action and returns the command’s output or an error message.
+Executes pip commands based on the provided action and returns the command's output or an error message.
 
 ------------------------------------------------------------
 API CALL (api_call)

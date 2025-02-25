@@ -20,6 +20,8 @@ from providers.provider_library import ProviderLibrary
 from prompts.prompt_manager import PromptManager
 from prompts.goals.goal_manager import GoalManager
 
+# Set global formatting bypass
+BYPASS_FORMATTER = True
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Run autonomous agent with specified LLM provider')
@@ -97,7 +99,7 @@ class AutonomousAgent:
         Run in either single response mode or multi-step autonomous mode.
         """
         # First create the inline parser to convert function calls to TOOL_CALL format
-        inline_parser = InlineCallParser(self.tool_manager.tools)
+        parser = InlineCallParser(self.tool_manager.tools, bypass_formatter=BYPASS_FORMATTER)
         
         # Then create the tool parser to execute the TOOL_CALL formatted calls
         tool_parser = RealTimeToolParser(tools=self.tool_manager.tools)
@@ -110,7 +112,7 @@ class AutonomousAgent:
                         {"content": self.prompt_manager.get_full_prompt()}
                     ]
                 })
-                final_text = inline_parser.feed(response["content"]["content"])
+                final_text = parser.feed(response["content"]["content"])
                 print(final_text)
                 print("\nEnd of single response.")
                 return
@@ -170,7 +172,7 @@ from scratch.
                         {"content": step_prompt}
                     ]
                 })
-                final_text = inline_parser.feed(result["content"]["content"])
+                final_text = parser.feed(result["content"]["content"])
                 self.log("\n--- Your Previous Response ---")
                 self.log(final_text)
                 time.sleep(3)
@@ -181,7 +183,7 @@ from scratch.
                 chunk_text = chunk.get("response", "")
                 try:
                     # First convert function calls to TOOL_CALL format
-                    formatted_text = inline_parser.feed(chunk_text)
+                    formatted_text = parser.feed(chunk_text)
                     
                     # Then execute any tool calls and get final text
                     user_text = tool_parser.feed(formatted_text)

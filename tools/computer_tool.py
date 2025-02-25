@@ -7,7 +7,13 @@ import io
 import os
 from typing import Dict, Any, Literal, Optional, Tuple
 
-import pyautogui
+try:
+    from utils.import_helper import pyautogui, HAS_GUI
+except ImportError:
+    import sys
+    print("Error: Could not import required helper module", file=sys.stderr)
+    sys.exit(1)
+
 import platform
 import psutil
 
@@ -130,6 +136,7 @@ class ComputerTool(Tool):
 
     def __init__(self):
         super().__init__()
+        self.has_gui = HAS_GUI
         self.screen_width, self.screen_height = pyautogui.size()
         self.os_name = platform.system().lower()
         if os.name == 'nt':
@@ -157,6 +164,8 @@ class ComputerTool(Tool):
 
     def _take_screenshot(self) -> str:
         """Take a screenshot and return as base64 string."""
+        if not self.has_gui:
+            return {"error": "GUI functionality not available"}
         screenshot = pyautogui.screenshot()
         buffered = io.BytesIO()
         screenshot.save(buffered, format="PNG")
@@ -164,15 +173,17 @@ class ComputerTool(Tool):
 
     def find_and_move_window(self, title_substring: str) -> Optional[int]:
         """Find a window by title substring and move it to the primary monitor."""
+        if not self.has_gui:
+            return {"error": "GUI functionality not available"}
         def callback(hwnd, windows):
-            if win32gui.IsWindowVisible(hwnd):
-                title = win32gui.GetWindowText(hwnd)
+            if self.win32gui.IsWindowVisible(hwnd):
+                title = self.win32gui.GetWindowText(hwnd)
                 if title_substring.lower() in title.lower():
                     windows.append(hwnd)
             return True
         
         windows = []
-        win32gui.EnumWindows(callback, windows)
+        self.win32gui.EnumWindows(callback, windows)
         
         if not windows:
             return None
@@ -180,8 +191,8 @@ class ComputerTool(Tool):
         hwnd = windows[0]
         try:
             # Get current window placement
-            placement = win32gui.GetWindowPlacement(hwnd)
-            rect = win32gui.GetWindowRect(hwnd)
+            placement = self.win32gui.GetWindowPlacement(hwnd)
+            rect = self.win32gui.GetWindowRect(hwnd)
             
             # Calculate window size
             width = rect[2] - rect[0]
@@ -193,14 +204,14 @@ class ComputerTool(Tool):
             
             # Set window to normal state (not minimized/maximized)
             placement = list(placement)
-            placement[1] = win32con.SW_NORMAL
-            win32gui.SetWindowPlacement(hwnd, tuple(placement))
+            placement[1] = self.win32con.SW_NORMAL
+            self.win32gui.SetWindowPlacement(hwnd, tuple(placement))
             
             # Move window
-            win32gui.MoveWindow(hwnd, new_x, new_y, width, height, True)
+            self.win32gui.MoveWindow(hwnd, new_x, new_y, width, height, True)
             
             # Bring to front and focus
-            win32gui.SetForegroundWindow(hwnd)
+            self.win32gui.SetForegroundWindow(hwnd)
             
             return hwnd
         except Exception as e:
@@ -209,18 +220,20 @@ class ComputerTool(Tool):
 
     def find_window_by_title(self, title: str) -> Optional[int]:
         """Find a window by its title."""
+        if not self.has_gui:
+            return {"error": "GUI functionality not available"}
         try:
-            hwnd = win32gui.FindWindow(None, title)
-            if hwnd and win32gui.IsWindowVisible(hwnd):
+            hwnd = self.win32gui.FindWindow(None, title)
+            if hwnd and self.win32gui.IsWindowVisible(hwnd):
                 return hwnd
             # Try partial match
             def callback(hwnd, windows):
-                if win32gui.IsWindowVisible(hwnd):
-                    window_title = win32gui.GetWindowText(hwnd)
+                if self.win32gui.IsWindowVisible(hwnd):
+                    window_title = self.win32gui.GetWindowText(hwnd)
                     if title.lower() in window_title.lower():
                         windows.append(hwnd)
             windows = []
-            win32gui.EnumWindows(callback, windows)
+            self.win32gui.EnumWindows(callback, windows)
             return windows[0] if windows else None
         except Exception as e:
             print(f"Error finding window: {e}")
@@ -271,7 +284,7 @@ class ComputerTool(Tool):
                     }
                 hwnd = self.find_window_by_title(window_title)
                 if hwnd:
-                    rect = win32gui.GetWindowRect(hwnd)
+                    rect = self.win32gui.GetWindowRect(hwnd)
                     return {
                         "type": "tool_result",
                         "tool_use_id": tool_use_id,
@@ -281,8 +294,8 @@ class ComputerTool(Tool):
                             "window_handle": hwnd,
                             "position": [rect[0], rect[1]],
                             "size": [rect[2] - rect[0], rect[3] - rect[1]],
-                            "title": win32gui.GetWindowText(hwnd),
-                            "class": win32gui.GetClassName(hwnd)
+                            "title": self.win32gui.GetWindowText(hwnd),
+                            "class": self.win32gui.GetClassName(hwnd)
                         }
                     }
                 return {
@@ -307,9 +320,9 @@ class ComputerTool(Tool):
                 hwnd = self.find_window_by_title(window_title)
                 if hwnd:
                     if not size:
-                        rect = win32gui.GetWindowRect(hwnd)
+                        rect = self.win32gui.GetWindowRect(hwnd)
                         size = [rect[2] - rect[0], rect[3] - rect[1]]
-                    win32gui.MoveWindow(hwnd, position[0], position[1], size[0], size[1], True)
+                    self.win32gui.MoveWindow(hwnd, position[0], position[1], size[0], size[1], True)
                     return {
                         "type": "tool_result",
                         "tool_use_id": tool_use_id,
@@ -341,9 +354,9 @@ class ComputerTool(Tool):
                 hwnd = self.find_window_by_title(window_title)
                 if hwnd:
                     # Ensure window is not minimized
-                    if win32gui.IsIconic(hwnd):
-                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                    win32gui.SetForegroundWindow(hwnd)
+                    if self.win32gui.IsIconic(hwnd):
+                        self.win32gui.ShowWindow(hwnd, self.win32con.SW_RESTORE)
+                    self.win32gui.SetForegroundWindow(hwnd)
                     return {
                         "type": "tool_result",
                         "tool_use_id": tool_use_id,
@@ -374,7 +387,7 @@ class ComputerTool(Tool):
                     }
                 hwnd = self.find_window_by_title(window_title)
                 if hwnd:
-                    rect = win32gui.GetWindowRect(hwnd)
+                    rect = self.win32gui.GetWindowRect(hwnd)
                     return {
                         "type": "tool_result",
                         "tool_use_id": tool_use_id,
@@ -384,12 +397,12 @@ class ComputerTool(Tool):
                             "window_handle": hwnd,
                             "position": [rect[0], rect[1]],
                             "size": [rect[2] - rect[0], rect[3] - rect[1]],
-                            "title": win32gui.GetWindowText(hwnd),
-                            "class": win32gui.GetClassName(hwnd),
-                            "visible": win32gui.IsWindowVisible(hwnd),
-                            "enabled": win32gui.IsWindowEnabled(hwnd),
-                            "minimized": win32gui.IsIconic(hwnd),
-                            "foreground": hwnd == win32gui.GetForegroundWindow()
+                            "title": self.win32gui.GetWindowText(hwnd),
+                            "class": self.win32gui.GetClassName(hwnd),
+                            "visible": self.win32gui.IsWindowVisible(hwnd),
+                            "enabled": self.win32gui.IsWindowEnabled(hwnd),
+                            "minimized": self.win32gui.IsIconic(hwnd),
+                            "foreground": hwnd == self.win32gui.GetForegroundWindow()
                         }
                     }
                 return {
@@ -441,7 +454,7 @@ class ComputerTool(Tool):
                     }
                 
                 # Store current window focus
-                active_window = win32gui.GetForegroundWindow()
+                active_window = self.win32gui.GetForegroundWindow()
                 
                 if action == Action.KEY:
                     pyautogui.hotkey(*text.split('+'))
@@ -450,7 +463,7 @@ class ComputerTool(Tool):
                 
                 # Restore window focus
                 if active_window:
-                    win32gui.SetForegroundWindow(active_window)
+                    self.win32gui.SetForegroundWindow(active_window)
                 
                 return {
                     "type": "tool_result",
@@ -476,7 +489,7 @@ class ComputerTool(Tool):
                 }
 
             elif action == Action.CURSOR_POSITION:
-                x, y = win32api.GetCursorPos()
+                x, y = self.win32api.GetCursorPos()
                 return {
                     "type": "tool_result",
                     "tool_use_id": tool_use_id,

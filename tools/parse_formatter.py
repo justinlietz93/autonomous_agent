@@ -138,7 +138,7 @@ class InlineCallParser:
     # Will catch function calls like file_write("path","""Multi line content """)
     FUNCTION_REGEX = re.compile(r'(^|[\s\.\,\;\:\!])(\w+)\s*\(',flags=re.DOTALL)
 
-    def __init__(self, tool_functions: Dict[str, Any], marker: str = "TOOL_CALL:", bypass_formatter: bool = False):
+    def __init__(self, tool_functions: Dict[str, Any], marker: str = "TOOL_CALL:", bypass_formatter: bool = True):
         """
         Args:
             tool_functions: a dict {tool_name: callable(**kwargs) -> str}

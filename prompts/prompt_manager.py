@@ -8,7 +8,7 @@ class PromptManager:
     """Manages system prompts and their loading/access."""
     
     DEFAULT_PROMPT = "SELF_OPTIMIZATION"
-    SYSTEM_PROMPTS = {"BASE_RULES", "TOOL_MENU"}  # Prompts that shouldn't be listed
+    SYSTEM_PROMPTS = {"BASE_RULES", "JSON_TOOL_MENU"}  # Prompts that shouldn't be listed
     BENCHMARK_PROMPTS = {"*_BENCHMARK"}  # Add your benchmark prompts here
     
     def __init__(self, default_prompt: str = None, model_name: str = "AI Assistant", goal_prompt: str = None):
