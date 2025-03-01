@@ -13,12 +13,15 @@ import string
 from providers.utils.safe_chunker import SafeChunker
 from providers.utils.stream_smoother import StreamSmoother
 from tools.parse_formatter import InlineCallParser
-from tools.tool_parser import ToolCallError, RealTimeToolParser
+from tools.tool_parser import RealTimeToolParser, ToolCallError
 from memory.context_manager import ContextStorage
 from tools.tool_manager import ToolManager
 from providers.provider_library import ProviderLibrary
 from prompts.prompt_manager import PromptManager
 from prompts.goals.goal_manager import GoalManager
+from utils.connection_monitor import connection_monitor
+import socket
+from utils.loop_breaker import LoopBreaker
 
 # Set global formatting bypass
 BYPASS_FORMATTER = True
@@ -94,6 +97,9 @@ class AutonomousAgent:
 
         # print("Registered tools:", list(self.tool_manager.tools.keys()))
 
+        # Add loop breaker
+        self.loop_breaker = LoopBreaker()
+
     def run(self):
         """
         Run in either single response mode or multi-step autonomous mode.
@@ -158,27 +164,33 @@ from scratch.
             # 1) Attempt a streaming call
             final_text = ""
             try:
-                stream_generator = self.llm.stream({
-                    "messages": [
-                        {"content": self.prompt_manager.get_full_prompt()},
-                        {"content": step_prompt}
-                    ]
-                })
+                with connection_monitor("LLM Provider", timeout=60, log_callback=self.log) as status:
+                    stream_generator = self.llm.stream({
+                        "messages": [
+                            {"content": self.prompt_manager.get_full_prompt()},
+                            {"content": step_prompt}
+                        ]
+                    })
             except AttributeError:
                 # fallback if streaming not supported
-                result = self.llm.run({
-                    "messages": [
-                        {"content": self.prompt_manager.get_full_prompt()},
-                        {"content": step_prompt}
-                    ]
-                })
-                final_text = parser.feed(result["content"]["content"])
-                self.log("\n--- Your Previous Response ---")
-                self.log(final_text)
+                with connection_monitor("LLM Provider (Non-streaming)", timeout=60, log_callback=self.log) as status:
+                    result = self.llm.run({
+                        "messages": [
+                            {"content": self.prompt_manager.get_full_prompt()},
+                            {"content": step_prompt}
+                        ]
+                    })
+                    final_text = parser.feed(result["content"]["content"])
+                    self.log("\n--- Your Previous Response ---")
+                    self.log(final_text)
+                    
+                    # Update status with response info
+                    status.response_size = len(final_text) if final_text else 0
+                
                 time.sleep(3)
                 continue
 
-            # 2) We do typed-lag loop
+            # 2) We do typed-lag loop OUTSIDE the try/except block
             for chunk in stream_generator:
                 chunk_text = chunk.get("response", "")
                 try:
@@ -191,12 +203,14 @@ from scratch.
                     final_text += user_text
                     sys.stdout.write(user_text)
                     sys.stdout.flush()
-
                 except ToolCallError as e:
                     error_msg = f"\n[TOOL_CALL ERROR: {e.message}]\n"
                     final_text += error_msg
                     sys.stdout.write(error_msg)
                     sys.stdout.flush()
+
+            # After the loop completes, update the connection status
+            status.response_size = len(final_text) if final_text else 0
 
             # 3) After streaming ends, we have final_text
             if final_text == last_response:
@@ -212,8 +226,12 @@ from scratch.
             self.log(final_text)
 
             # Sleep a bit to avoid a tight loop
-            print("\nPausing for 3 seconds to avoid busy loop...")
-            time.sleep(3)
+            if self._is_real_loop(final_text, last_response):
+                self.log("Pausing for 3 seconds to avoid busy loop...")
+                time.sleep(3)
+            else:
+                # Continue normal operation - we're making progress
+                pass
             last_response = final_text
 
             ### THIS MIGHT BREAK SOMETHING, VERIFY ###
@@ -230,6 +248,33 @@ from scratch.
                         self.prompt_manager.set_active_prompt(next_prompt)
 
             ### THIS MIGHT BREAK SOMETHING, VERIFY ###
+
+            # Check for loops and intervene if necessary
+            loop_check = self.loop_breaker.check_for_loops(final_text)
+            if loop_check["intervention_needed"]:
+                intervention = self.loop_breaker.get_intervention()
+                print(f"\n[LOOP DETECTION] Breaking potential loop (pattern repeated {loop_check['count']} times)")
+                self.log(f"\n{intervention}")
+                
+                # Modify next step prompt to include intervention
+                self.goal = f"{self.goal}\n\n{intervention}"
+
+            # Check if any files exist first
+            if "file_read" in final_text and "Error: File not found" in final_text:
+                # Add a hint to the next prompt
+                self.log("\n[SYSTEM] File not found. Try listing available files first or creating new files.")
+                hint = "\n[SYSTEM HINT: Some files you tried to access don't exist. Try listing directories first and then reading the correct file names or creating files instead.]"
+                self.goal = f"{self.goal}{hint}"
+
+            # After streaming completes
+            try:
+                # Reset all parsers
+                if self.tool_manager:
+                    self.tool_manager.reset_parsers()
+                if self.llm and hasattr(self.llm, 'parser') and self.llm.parser:
+                    self.llm.parser.reset()
+            except Exception as e:
+                print(f"[WARNING] Could not reset parsers: {e}")
 
     def log(self, message: str):
         
@@ -252,6 +297,58 @@ from scratch.
                 return "".join(snippet).strip()
         except Exception as e:
             return f"[ERROR reading log: {e}]"
+
+    def _call_llm_with_retries(self, messages, max_retries=2):
+        """Call LLM with automatic retries for connection issues"""
+        retry = 0
+        while retry <= max_retries:
+            try:
+                with connection_monitor(
+                    f"LLM Provider (attempt {retry+1}/{max_retries+1})", 
+                    timeout=60, 
+                    log_callback=self.log
+                ) as status:
+                    # Try to use streaming if available
+                    if hasattr(self.llm, 'stream'):
+                        result = {'stream': True, 'generator': self.llm.stream({'messages': messages})}
+                    else:
+                        response = self.llm.run({'messages': messages})
+                        result = {'stream': False, 'response': response}
+                    
+                    # If we get here, the call was successful
+                    return result
+                    
+            except (socket.timeout, socket.error, ConnectionError, TimeoutError) as e:
+                retry += 1
+                if retry <= max_retries:
+                    self.log(f"[RETRY: Connection failed, retrying in 5 seconds ({retry}/{max_retries})]")
+                    time.sleep(5)  # Wait before retry
+                else:
+                    self.log(f"[ERROR: All connection attempts failed after {max_retries} retries]")
+                    raise
+        
+        # We should never reach here due to the raise in the else clause
+        return None
+
+    def _is_real_loop(self, current_output, previous_output):
+        """Determine if we're in a real loop or making progress."""
+        # No meaningful change between outputs suggests a loop
+        if current_output == previous_output:
+            return True
+        
+        # Simple content-based heuristics
+        loop_phrases = [
+            "Pausing for 3 seconds",
+            "For non-Anthropic queries"
+        ]
+        
+        # Check if output ends with one of these phrases
+        for phrase in loop_phrases:
+            if current_output.strip().endswith(phrase):
+                return True
+            
+        # Not a loop - we're making progress
+        return False
 
 
 if __name__ == "__main__":

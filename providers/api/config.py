@@ -26,7 +26,7 @@ class Config:
     DEEPSEEK_OUTPUT_MAX: int = 8192   # Max output tokens
     
     # Claude settings
-    CLAUDE_MODEL: str = os.getenv('CLAUDE_MODEL', 'claude-3-5-sonnet-20241022')
+    CLAUDE_MODEL: str = os.getenv('CLAUDE_MODEL', 'claude-3-7-sonnet-20250219')
     
     # Temperature recommendations
     TEMPERATURE_SETTINGS = {

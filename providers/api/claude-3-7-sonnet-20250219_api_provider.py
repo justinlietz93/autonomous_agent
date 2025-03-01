@@ -14,6 +14,9 @@ from tools.parse_formatter import InlineCallParser
 # And if you have a tool_manager:
 from tools.tool_manager import ToolManager
 
+# Add this import to your provider files
+from utils.connection_monitor import monitor_connection
+
 
 class Claude37SonnetProvider(Tool):
     name = "claude-3-7-sonnet-20250219_api"
@@ -51,37 +54,36 @@ class Claude37SonnetProvider(Tool):
 
     def __init__(self, tool_manager: ToolManager = None):
         super().__init__()
+        self.scoring_weights = {"accuracy": 0.5, "relevance": 0.5}
         self.client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
 
         # 1) Setup chunker + typed-lag smoother
         self.chunker = SafeChunker(flush_interval=1.5)
         self.smoother = StreamSmoother()
 
-        # 2) If you have a tool_manager, build the parser
+        # 2) Store tool_manager but don't create a parser - main_autonomous.py handles this
         self.tool_manager = tool_manager
-        if self.tool_manager:
-            self.parser = InlineCallParser(self.tool_manager.tools, marker="TOOL_CALL:")
-        else:
-            self.parser = None
+        self.parser = None  # Don't create InlineCallParser here
 
-    def run(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    @monitor_connection("Anthropic API", max_retries=2)
+    def generate_response(self, prompt, **kwargs):
         """Non-streaming approach, optional."""
         try:
-            messages = self._normalize_messages(params["messages"])
+            messages = self._normalize_messages(prompt)
             
             # Build request parameters
             request_params = {
                 "model": Config.CLAUDE_MODEL,
-                "max_tokens": params.get("max_tokens", 4096),
+                "max_tokens": kwargs.get("max_tokens", 4096),
                 "messages": messages
             }
             
             # Add optional parameters if provided
-            if "temperature" in params:
-                request_params["temperature"] = params["temperature"]
+            if "temperature" in kwargs:
+                request_params["temperature"] = kwargs["temperature"]
                 
-            if "thinking" in params:
-                request_params["thinking"] = params["thinking"]
+            if "thinking" in kwargs:
+                request_params["thinking"] = kwargs["thinking"]
             
             response = self.client.messages.create(**request_params)
             content_str = response.content[0].text if response.content else ""
@@ -108,6 +110,14 @@ class Claude37SonnetProvider(Tool):
     def stream(self, params: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
         """Streaming approach with debug prints, chunker, parser, typed-lag."""
         try:
+            # Reset parser state at the beginning of each stream
+            if self.parser:
+                try:
+                    self.parser.reset()
+                    self.chunker.flush_remaining()  # Reset chunker state too
+                except Exception as e:
+                    print(f"Warning: Could not reset parser: {e}")
+                
             messages = self._normalize_messages(params["messages"])
             
             # Build request parameters
@@ -167,3 +177,44 @@ class Claude37SonnetProvider(Tool):
                 content = msg.get("content", "")
                 messages.append({"role": role, "content": content})
         return messages
+
+    def run(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Required implementation for the abstract Tool class method."""
+        try:
+            messages = self._normalize_messages(params["messages"])
+            
+            # Build request parameters
+            request_params = {
+                "model": Config.CLAUDE_MODEL,
+                "max_tokens": params.get("max_tokens", 4096),
+                "messages": messages
+            }
+            
+            # Add optional parameters if provided
+            if "temperature" in params:
+                request_params["temperature"] = params["temperature"]
+                
+            if "thinking" in params:
+                request_params["thinking"] = params["thinking"]
+            
+            response = self.client.messages.create(**request_params)
+            content_str = response.content[0].text if response.content else ""
+            return {
+                "type": "tool_result",
+                "content": {
+                    "status": "success",
+                    "message": "Response generated",
+                    "content": content_str,
+                    "response": content_str
+                }
+            }
+        except Exception as e:
+            return {
+                "type": "tool_result",
+                "content": {
+                    "status": "error",
+                    "message": f"Claude API error: {str(e)}",
+                    "content": str(e),
+                    "response": str(e)
+                }
+            }

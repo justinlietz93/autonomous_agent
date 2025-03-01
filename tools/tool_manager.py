@@ -125,4 +125,18 @@ class ToolManager:
         tool = self.get_tool(name)
         return tool.run(tool_call_id, **kwargs)
 
+    def reset_parsers(self):
+        """Reset all tool parsers to clear any lingering state."""
+        # Reset the main parser(s) if present
+        if hasattr(self, 'parser') and self.parser:
+            self.parser.reset()
+        
+        # Also reset any parsers in registered tools
+        for tool_name, tool in self.tools.items():
+            if hasattr(tool, 'parser') and tool.parser:
+                try:
+                    tool.parser.reset()
+                except Exception as e:
+                    print(f"Warning: Could not reset parser for {tool_name}: {e}")
+
     

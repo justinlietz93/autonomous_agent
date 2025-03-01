@@ -1,0 +1,206 @@
+# Repository Code Map
+
+Repository: `autonomous_agent`
+Generated: C:\git\autonomous_agent
+
+## Directory Structure
+
+* **docs/**
+    * deepseek_api.md
+    * ollama_api.md
+    * project_plan.md
+    * tool_pipeline_issues.md
+* **memory/**
+    * **context_logs/**
+        * context_20250225_062833_None_8y2tps.txt
+        * context_20250225_063443_None_840cyw.txt
+        * context_20250225_063711_None_pjk19j.txt
+        * context_20250225_064017_None_cqfz5s.txt
+        * context_20250225_070046_None_mrqkwg.txt
+        * context_20250225_070652_None_o4qxwn.txt
+        * context_20250225_071337_None_jk1bw8.txt
+        * context_20250228_113220_None_vcyvj9.txt
+        * context_20250228_113809_None_momw3r.txt
+        * context_20250228_113949_None_3xzkt5.txt
+        * context_20250228_114245_None_ajjuxa.txt
+        * context_20250228_115321_None_jngwdi.txt
+        * context_20250228_115919_None_piuquo.txt
+    * **goals/**
+    * **memory_tiers/**
+        * long_term.py
+        * medium_term.py
+        * short_term.py
+    * __init__.py
+    * context_manager.py
+* **prompts/**
+    * **goals/**
+        * **sequences/**
+            * demo_mapping.json
+            * memory_development.json
+        * goal_manager.py
+    * **system_prompts/**
+        * **benchmarks/**
+            * reasoning_1_benchmark.py
+            * reasoning_2_benchmark.py
+            * reasoning_3_benchmark.py
+            * reasoning_4_benchmark.py
+            * reasoning_5_benchmark.py
+        * **debugging/**
+            * codebase_review.py
+        * **demo/**
+            * analysis.py
+            * documentation.py
+            * navigation.py
+            * research.py
+        * **role_prompts/**
+            * ai_engineer.py
+            * system_architect.py
+        * ad_hoc.py
+        * base_rules.py
+        * build_memory.py
+        * debug.py
+        * demo_prompt.py
+        * json_tool_menu.py
+        * navigation_prompt.py
+        * prompt_analysis.py
+        * prompt_template.py
+        * rcot.py
+        * read_prompt.py
+        * research.py
+        * sandbox.py
+        * self_fix.py
+        * self_optimization.py
+        * test_analysis.py
+        * tool_check.py
+        * tool_execution.py
+        * tool_menu.py
+    * prompt_manager.py
+* **providers/**
+    * **api/**
+        * claude-3-5-sonnet-20241022_api_provider.py
+        * claude-3-7-sonnet-20250219_api_provider.py
+        * config.py
+        * deepseek-r1_api_provider.py
+    * **local/**
+        * command-r7b-fp16_ollama_provider.py
+        * command-r7b-latest_ollama_provider.py
+        * create_ollama_provider.py
+        * deepseek-r1-14b-QD-fp16_ollama_provider.py
+        * deepseek-r1-14b_ollama_provider.py
+        * deepseek-r1-32b_ollama_provider.py
+        * dolphin38b-llama3-1-fp16_ollama_provider.py
+        * gemma227b_ollama_provider.py
+        * llama3-3-latest_ollama_provider.py
+        * ollama_provider_template.py
+        * olmo213b-1124-instruct-q8_0_ollama_provider.py
+        * phi4_ollama_provider.py
+        * qwen2-5-coder_ollama_provider.py
+        * qwq-latest_ollama_provider.py
+        * template_provider.py
+        * update_providers.py
+    * **utils/**
+        * safe_chunker.py
+        * stream_smoother.py
+        * throbber.py
+    * __init__.py
+    * provider_library.py
+* **rules/**
+    * automation.mdc
+    * autonomousoperation.mdc
+    * bugfixverification.mdc
+    * bugfixworkflow.mdc
+    * codeorganization.mdc
+    * componentintegration.mdc
+    * criticalbugfixing.mdc
+    * dependencymanagement.mdc
+    * errorhandling.mdc
+    * goaltracking.mdc
+    * handoffsummary.mdc
+    * knowledgemanagement.mdc
+    * llmcontext.mdc
+    * minimalchanges.mdc
+    * performance.mdc
+    * readingfiles.mdc
+    * rule1tdd.mdc
+    * statemanagement.mdc
+    * systemarchitecture.mdc
+    * testingstandards.mdc
+    * toolbase.mdc
+* **sandbox/**
+    * LLM_memory_system.md
+* **system/**
+* **tests/**
+    * **integration/**
+    * **prompts/**
+        * **generated_prompts/**
+            * prompt_self_optimization_20250208_192415.txt
+            * prompt_self_optimization_20250208_192530.txt
+            * prompt_self_optimization_20250208_193810.txt
+        * test_prompt.py
+    * **providers/**
+        * __init__.py
+        * test_provider_library.py
+    * **system/**
+    * **tools/**
+        * **integration/**
+            * __init__.py
+            * test_tools_integration.py
+        * __init__.py
+        * conftest.py
+        * test_config.py
+        * test_file_tool.py
+        * test_file_tool_integration.py
+        * test_helpers.py
+        * test_shell_tool.py
+        * test_tool_call.py
+        * test_tool_parser.py
+        * test_tool_pipeline.py
+        * verify_imports.py
+    * **unit/**
+    * __init__.py
+    * conftest.py
+* **to_do/**
+    * parser_plan.txt
+    * tool_pipeline.txt
+* **tools/**
+    * __init__.py
+    * api_tool.py
+    * code_runner_tool.py
+    * computer_tool.py
+    * config.py
+    * doc_check_tool.py
+    * file_tool.py
+    * package_manager_tool.py
+    * parse_formatter.py
+    * requests_tool.py
+    * shell_tool.py
+    * tool_base.py
+    * tool_development.md
+    * tool_manager.py
+    * tool_parser.py
+    * tool_registry.py
+    * tool_schema.py
+    * tool_wrapper.py
+    * types.py
+    * web_browser_tool.py
+    * web_search_tool.py
+* **utils/**
+    * code_mapper.py
+    * connection_monitor.py
+    * generate_code_map.py
+    * import_helper.py
+    * log_pruner.py
+    * loop_breaker.py
+* .cursorrules
+* .gitattributes
+* .gitignore
+* README.md
+* dockerfile
+* generate_code_map.py
+* main_autonomous.py
+* notes.txt
+* project_structure.md
+* requirements.txt
+* setup.py
+* setup_docker.sh
+* setup_env.sh

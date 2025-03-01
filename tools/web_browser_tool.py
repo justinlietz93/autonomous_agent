@@ -60,13 +60,41 @@ class WebBrowserTool(Tool):
         }
 
     def run(self, input: Dict[str, Any]) -> Dict[str, Any]:
-        url = input.get("url")
-        extract_type = input.get("extract_type", "text")  # Default to text
-        
-        response = requests.get(url)
-        if extract_type == "text":
-            soup = BeautifulSoup(response.text, 'html.parser')
-            return {"content": soup.get_text()}  # Full page text includes "Example Domain"
+        """Execute the tool with specified parameters."""
+        try:
+            url = input.get("url")
+            if not url:
+                return {"type": "tool_response", "content": "Error: URL is required"}
+            
+            extract_type = input.get("extract_type", "text")
+            timeout = min(input.get("timeout", 10), 15)  # Enforce reasonable timeout
+            
+            try:
+                response = requests.get(url, headers={"User-Agent": self.user_agent}, timeout=timeout)
+                
+                if not response.ok:
+                    return {"type": "tool_response", "content": f"Error: HTTP {response.status_code} - {response.reason}"}
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                if extract_type == "text":
+                    content = self._extract_text(soup)
+                elif extract_type == "links":
+                    content = self._extract_links(soup)
+                elif extract_type == "title":
+                    content = self._extract_title(soup)
+                else:
+                    content = f"Unknown extract type: {extract_type}"
+                
+                return {"type": "tool_response", "content": content[:10000]}  # Limit content size
+                
+            except requests.Timeout:
+                return {"type": "tool_response", "content": f"Error: Request to {url} timed out after {timeout} seconds"}
+            except requests.RequestException as e:
+                return {"type": "tool_response", "content": f"Error: Request failed - {str(e)}"}
+            
+        except Exception as e:
+            return {"type": "tool_response", "content": f"Error: {str(e)}"}
 
     def _extract_text(self, soup: BeautifulSoup) -> str:
         """Extract main text content from page."""

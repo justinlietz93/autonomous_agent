@@ -95,6 +95,10 @@ class OllamaDeepSeek14bProvider(Tool):
             yield {"response": "Error: Ollama is not running. Please start Ollama first."}
             return
 
+        # Reset parser state at the beginning of each stream
+        if self.parser:
+            self.parser.reset()
+
         try:
             # Debug tool availability
             if self.parser:
